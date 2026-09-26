@@ -1,0 +1,1011 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="StowNest B2C lead performance dashboard, live from Google Sheets.">
+<title>StowNest B2C Leads</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root{
+  --bg:#F4F7F5; --surface:#FFFFFF; --surface-2:#F8FAF8; --ink:#1D2520; --ink-2:#45514A; --muted:#6B7770;
+  --border:#E1E7E2; --border-strong:#CAD4CC; --brand:#49B85A; --brand-ink:#2B8039; --brand-soft:#EAF6EC; --brand-line:#BFE3C5;
+  --c-valid:#3DA64F; --c-valid-soft:#BCE3C3; --c-invalid:#3D66B5; --grid:#EBF0EC;
+  --warn:#9A6212; --warn-soft:#FDF5E6; --warn-line:#EED7AE; --err:#B03A2E;
+  --shadow:0 1px 2px rgba(22,44,30,.05),0 6px 20px rgba(22,44,30,.06);
+  --radius:14px; --logo-bg:transparent; --logo-pad:0;
+  --font:"Plus Jakarta Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#101412; --surface:#171C19; --surface-2:#1C221E; --ink:#E7EDE9; --ink-2:#B9C4BD; --muted:#8B978F;
+    --border:#29312C; --border-strong:#39443D; --brand:#49B85A; --brand-ink:#6FCC7E; --brand-soft:#18261C; --brand-line:#2D5234;
+    --c-valid:#45AD57; --c-valid-soft:#2B5433; --c-invalid:#6B8FE0; --grid:#222925;
+    --warn:#E3AE55; --warn-soft:#2A2315; --warn-line:#4D3E22; --err:#EE8577;
+    --shadow:0 1px 2px rgba(0,0,0,.3); --logo-bg:#FFFFFF; --logo-pad:6px 10px;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#101412; --surface:#171C19; --surface-2:#1C221E; --ink:#E7EDE9; --ink-2:#B9C4BD; --muted:#8B978F;
+  --border:#29312C; --border-strong:#39443D; --brand:#49B85A; --brand-ink:#6FCC7E; --brand-soft:#18261C; --brand-line:#2D5234;
+  --c-valid:#45AD57; --c-valid-soft:#2B5433; --c-invalid:#6B8FE0; --grid:#222925;
+  --warn:#E3AE55; --warn-soft:#2A2315; --warn-line:#4D3E22; --err:#EE8577;
+  --shadow:0 1px 2px rgba(0,0,0,.3); --logo-bg:#FFFFFF; --logo-pad:6px 10px;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:clamp(16px,3vw,32px)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* Header */
+.top{background:var(--surface);border-bottom:1px solid var(--border)}
+.top .wrap{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;padding-block:22px 20px}
+.brand{display:inline-flex;align-items:center;margin-bottom:12px;background:var(--logo-bg);border-radius:8px;padding:var(--logo-pad)}
+.brand img{display:block;height:34px;width:auto;max-width:100%}
+h1{margin:0;font-size:clamp(20px,2.6vw,28px);font-weight:800;letter-spacing:.01em;text-wrap:balance;line-height:1.15}
+.sub{margin:4px 0 0;color:var(--muted);font-size:14px}
+.status{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);font-weight:600;font-size:13px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.pill[data-kind="live"] .dot{background:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.pill[data-kind="snapshot"] .dot,.pill[data-kind="file"] .dot{background:var(--warn)}
+.pill[data-kind="error"] .dot{background:var(--err)}
+.status-meta{font-size:12px;color:var(--muted);text-align:right}
+.status-actions{display:flex;gap:8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;border-radius:9px;border:1px solid var(--border-strong);background:var(--surface);font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--brand);color:var(--brand-ink)}
+.btn.sm{height:30px;padding:0 10px;font-size:12px}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{color:#fff;filter:brightness(.95)}
+.btn svg{width:14px;height:14px}
+
+/* Filter bar */
+.filters{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.filters .wrap{padding-block:12px}
+.fgrid{display:grid;grid-template-columns:130px 170px minmax(200px,1fr) 170px auto;gap:10px;align-items:end}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ctl{height:44px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface);padding:0 12px;font-size:15px;font-weight:600;width:100%;min-width:0}
+select.ctl{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7770' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.search{position:relative}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)}
+.search .ctl{padding-left:36px;font-weight:500}
+.fhint{grid-column:1/-1;font-size:12px;color:var(--muted);min-height:18px}
+.fhint.err{color:var(--err);font-weight:600}
+.fhint.ok{color:var(--brand-ink)}
+.btn.reset{height:44px}
+
+/* Layout */
+main{padding-block:24px 48px;display:flex;flex-direction:column;gap:28px}
+.sec-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px;margin-bottom:12px}
+.sec-h h2{margin:0;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.sec-h .note{font-size:12px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--ink-2);white-space:nowrap}
+.chip.warn{background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
+.banner{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:var(--warn-soft);border:1px solid var(--warn-line);color:var(--ink);font-size:13px}
+.banner b{color:var(--warn)}
+
+/* KPI grid */
+.kpis{display:grid;grid-template-columns:1.25fr 1fr 1fr;grid-template-areas:"hero valid invalid" "hero total rate" "hero annual annual";gap:14px}
+.kpi{padding:18px 20px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kpi .lbl{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+.kpi .lbl i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.kpi .val{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.01em;line-height:1.1}
+.kpi .foot{font-size:12px;color:var(--muted)}
+.k-valid{grid-area:valid}.k-invalid{grid-area:invalid}.k-total{grid-area:total}.k-rate{grid-area:rate}
+.k-annual{grid-area:annual;display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px;align-items:end}
+.k-annual .mini .val{font-size:22px}
+.k-hero{grid-area:hero;background:var(--brand-soft);border-color:var(--brand-line);padding:24px;gap:10px;justify-content:space-between}
+.k-hero .lbl{color:var(--brand-ink)}
+.k-hero .val{font-size:clamp(48px,6vw,72px);color:var(--ink);letter-spacing:-.03em;line-height:1}
+.k-hero .val small{font-size:.45em;font-weight:700;margin-left:2px;color:var(--ink-2)}
+.hero-desc{font-size:15px;color:var(--ink-2);max-width:38ch}
+.hero-desc b{color:var(--ink)}
+.strip{display:flex;gap:2px;height:28px;border-radius:6px;overflow:hidden;margin-top:6px}
+.strip span{display:block;background:var(--c-valid-soft);min-width:3px;cursor:pointer;position:relative}
+.strip span.on{background:var(--brand)}
+.strip span:hover{filter:brightness(.92)}
+.strip-axis{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px}
+.hero-meta .chip{background:var(--surface);border-color:var(--brand-line)}
+
+/* Selected month */
+.month-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:0}
+.month-left{padding:22px 24px;border-right:1px solid var(--border)}
+.month-title{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:.02em;margin:0 0 4px;text-transform:uppercase}
+.month-src{font-size:12px;color:var(--muted);margin-bottom:14px}
+.mrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 0;border-top:1px solid var(--border)}
+.mrow:first-of-type{border-top:0}
+.mrow .k{color:var(--ink-2);font-weight:500;display:flex;align-items:center;gap:8px}
+.mrow .k i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.mrow .v{font-weight:700;font-size:18px}
+.mrow.em .v{color:var(--brand-ink);font-size:22px}
+.month-right{padding:22px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.donut-box{position:relative;width:min(240px,100%);aspect-ratio:1;max-width:100%}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;text-align:center}
+.donut-center b{font-size:26px;font-weight:800}
+.donut-center span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.legend i.line{height:3px;width:16px;border-radius:2px}
+
+/* Charts */
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.chart-card{padding:18px 20px 14px;min-width:0}
+.chart-card h3{margin:0;font-size:15px;font-weight:700}
+.chart-card .cap{font-size:12px;color:var(--muted);margin:2px 0 10px}
+.chart-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px;align-items:flex-start}
+.chart-box{position:relative;height:300px;width:100%}
+
+/* Annual summary */
+.ann-stats{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border)}
+.ann-stats>div{padding:18px 20px;border-left:1px solid var(--border)}
+.ann-stats>div:first-child{border-left:0}
+.ann-stats .lbl{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.ann-stats .val{font-size:24px;font-weight:800;margin-top:2px}
+
+/* Tables */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 14px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border)}
+th:first-child,td:first-child{text-align:left}
+th{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--surface-2);position:sticky;top:0;z-index:1}
+td{font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:0}
+tbody tr.sel td{background:var(--brand-soft);font-weight:700}
+tbody tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--brand)}
+tbody tr.nodata td{color:var(--muted)}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--surface-2)}
+tbody tr.sel.click:hover td{background:var(--brand-soft)}
+tfoot td{font-weight:800;border-top:1px solid var(--border-strong);border-bottom:0;background:var(--surface-2)}
+.th-btn{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.th-btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:3px}
+.th-btn .arr{opacity:.35;font-size:10px}
+.th-btn[aria-sort] .arr{opacity:1;color:var(--brand-ink)}
+.tbl-tools{display:flex;flex-wrap:wrap;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);align-items:center}
+.tbl-tools .ctl{height:38px;font-size:14px}
+.tbl-tools .search{flex:1 1 220px}
+.tbl-tools .count{font-size:12px;color:var(--muted);margin-left:auto}
+.tbl-scroll{max-height:520px;overflow:auto}
+.bar-cell{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end}
+.bar-cell u{display:inline-block;height:6px;border-radius:3px;background:var(--c-valid);text-decoration:none;opacity:.75}
+
+/* Compare */
+.cmp-pick{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:end;padding:16px 20px;border-bottom:1px solid var(--border)}
+.cmp-pick .vs{height:44px;display:grid;place-items:center}
+.cmp-table td,.cmp-table th{padding:12px 20px}
+.cmp-table td.d{color:var(--ink-2)}
+.cmp-note{padding:10px 20px 14px;font-size:12px;color:var(--muted)}
+
+/* Data quality */
+details.dq{padding:0}
+details.dq summary{cursor:pointer;padding:14px 20px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-weight:700;list-style:none}
+details.dq summary::-webkit-details-marker{display:none}
+details.dq summary .chev{margin-left:auto;color:var(--muted);transition:transform .15s}
+details.dq[open] summary .chev{transform:rotate(180deg)}
+.dq-body{padding:0 20px 18px;display:grid;gap:14px;font-size:13px;color:var(--ink-2)}
+.dq-body ul{margin:0;padding-left:18px}
+.dq-body li{margin:2px 0}
+code,.mono{font-family:var(--mono);font-size:12px}
+code{background:var(--surface-2);border:1px solid var(--border);padding:1px 6px;border-radius:5px;word-break:break-all}
+.cfg{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;white-space:pre;font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--ink)}
+
+.empty{padding:48px 24px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:6px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Responsive */
+@media (max-width:1100px){
+  .charts{grid-template-columns:1fr}
+  .fgrid{grid-template-columns:120px 150px minmax(180px,1fr) 160px auto}
+}
+@media (max-width:900px){
+  .kpis{grid-template-columns:1fr 1fr;grid-template-areas:"hero hero" "valid invalid" "total rate" "annual annual"}
+  .month-grid{grid-template-columns:1fr}
+  .month-left{border-right:0;border-bottom:1px solid var(--border)}
+  .fgrid{grid-template-columns:1fr 1fr}
+  .fgrid .search-field{grid-column:1/-1}
+  .ann-stats{grid-template-columns:1fr 1fr}
+  .ann-stats>div:nth-child(3){border-left:0}
+  .ann-stats>div:nth-child(n+3){border-top:1px solid var(--border)}
+  .status{align-items:flex-start}
+  .status-meta{text-align:left}
+}
+@media (max-width:560px){
+  .kpis{grid-template-columns:1fr;grid-template-areas:"hero" "valid" "invalid" "total" "rate" "annual"}
+  .k-annual{grid-template-columns:1fr 1fr}
+  .k-annual .main{grid-column:1/-1}
+  .filters{position:static}
+  .chart-box{height:260px}
+  .cmp-pick{grid-template-columns:1fr}
+  .cmp-pick .vs{height:auto}
+  .cmp-table td,.cmp-table th{padding:10px 12px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div>
+      <div class="brand"><img src="data:image/jpeg;base64,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" alt="StowNest" width="289" height="67"></div>
+      <h1>B2C LEAD PERFORMANCE DASHBOARD</h1>
+      <p class="sub">Monthly Valid &amp; Invalid Lead Performance</p>
+    </div>
+    <div class="status">
+      <span class="pill" id="statusPill" data-kind="loading"><span class="dot"></span><span id="statusText">Connecting to Google Sheet…</span></span>
+      <div class="status-meta" id="statusMeta">Last Updated: —</div>
+      <div class="status-actions">
+        <button class="btn sm" id="refreshBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Refresh data</button>
+        <label class="btn sm" for="csvFile">Load CSV</label>
+        <input type="file" id="csvFile" accept=".csv,text/csv" class="sr">
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="filters" id="filters">
+  <div class="wrap">
+    <div class="fgrid">
+      <div class="field"><label for="yearSel">Year</label><select id="yearSel" class="ctl"></select></div>
+      <div class="field"><label for="monthSel">Month</label><select id="monthSel" class="ctl"></select></div>
+      <div class="field search-field"><label for="searchBox">Search month / year</label>
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="searchBox" class="ctl" type="search" list="monthList" placeholder="August 2025 · Aug 2025 · 08/2025 · 2025-08" autocomplete="off"></div>
+        <datalist id="monthList"></datalist>
+      </div>
+      <div class="field"><label for="picker">Month picker</label><input id="picker" class="ctl" type="month"></div>
+      <button class="btn reset" id="resetBtn" type="button">Reset</button>
+      <div class="fhint" id="fhint" aria-live="polite"></div>
+    </div>
+  </div>
+</div>
+
+<main class="wrap" id="main">
+  <div class="card empty" id="loadingState"><b>Loading lead data…</b>Reading the Google Sheet.</div>
+</main>
+
+<template id="dashTpl">
+  <div id="banners"></div>
+
+  <section aria-labelledby="kpiH">
+    <div class="sec-h"><h2 id="kpiH">Key metrics · <span data-bind="selLabel"></span></h2><span class="note" data-bind="kpiNote"></span></div>
+    <div class="kpis">
+      <article class="card kpi k-hero">
+        <div>
+          <div class="lbl">Month share of annual valid leads</div>
+          <div class="val num" data-bind="shareBig"></div>
+        </div>
+        <p class="hero-desc" data-bind="shareDesc"></p>
+        <div>
+          <div class="strip" id="shareStrip" role="img"></div>
+          <div class="strip-axis"><span>Jan</span><span data-bind="stripEnd">Dec</span></div>
+        </div>
+        <div class="hero-meta" data-bind="heroMeta"></div>
+      </article>
+      <article class="card kpi k-valid"><div class="lbl"><i style="background:var(--c-valid)"></i>Valid leads</div><div class="val num" data-bind="kValid"></div><div class="foot" data-bind="kValidFoot"></div></article>
+      <article class="card kpi k-invalid"><div class="lbl"><i style="background:var(--c-invalid)"></i>Invalid leads</div><div class="val num" data-bind="kInvalid"></div><div class="foot" data-bind="kInvalidFoot"></div></article>
+      <article class="card kpi k-total"><div class="lbl">Total leads</div><div class="val num" data-bind="kTotal"></div><div class="foot">Valid + Invalid</div></article>
+      <article class="card kpi k-rate"><div class="lbl">Valid lead rate</div><div class="val num" data-bind="kRate"></div><div class="foot">Valid ÷ Total × 100</div></article>
+      <article class="card kpi k-annual">
+        <div class="main"><div class="lbl">Annual valid leads · <span data-bind="selYear"></span></div><div class="val num" data-bind="kAnnValid"></div><div class="foot" data-bind="kAnnFoot"></div></div>
+        <div class="mini"><div class="lbl">Annual invalid</div><div class="val num" data-bind="kAnnInvalid"></div></div>
+        <div class="mini"><div class="lbl">Annual total</div><div class="val num" data-bind="kAnnTotal"></div></div>
+      </article>
+    </div>
+  </section>
+
+  <section aria-labelledby="monH">
+    <div class="sec-h"><h2 id="monH">Selected month</h2><span class="note">Valid vs invalid split for the selected month</span></div>
+    <div class="card month-grid">
+      <div class="month-left">
+        <h3 class="month-title" data-bind="monthTitle"></h3>
+        <div class="month-src mono" data-bind="monthSrc"></div>
+        <div class="mrow"><span class="k"><i style="background:var(--c-valid)"></i>Valid Leads</span><span class="v num" data-bind="mValid"></span></div>
+        <div class="mrow"><span class="k"><i style="background:var(--c-invalid)"></i>Invalid Leads</span><span class="v num" data-bind="mInvalid"></span></div>
+        <div class="mrow"><span class="k">Total Leads</span><span class="v num" data-bind="mTotal"></span></div>
+        <div class="mrow"><span class="k">Valid Lead Rate</span><span class="v num" data-bind="mRate"></span></div>
+        <div class="mrow em"><span class="k" data-bind="mShareLbl"></span><span class="v num" data-bind="mShare"></span></div>
+      </div>
+      <div class="month-right">
+        <div class="donut-box"><canvas id="donut" aria-label="Valid versus invalid leads donut chart"></canvas><div class="donut-center"><b class="num" data-bind="donutRate"></b><span>Valid rate</span></div></div>
+        <div class="legend"><span><i style="background:var(--c-valid)"></i>B2C Valid <b class="num" data-bind="lgValid"></b></span><span><i style="background:var(--c-invalid)"></i>B2C Invalid <b class="num" data-bind="lgInvalid"></b></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="yrH">
+    <div class="sec-h"><h2 id="yrH">Yearly performance · <span data-bind="selYear"></span></h2><span class="note" data-bind="yrNote"></span></div>
+    <div class="charts">
+      <article class="card chart-card">
+        <div class="chart-head"><div><h3>Monthly valid &amp; invalid leads</h3><p class="cap">Number of leads, Jan–Dec <span data-bind="selYear"></span></p></div>
+          <div class="legend"><span><i class="line" style="background:var(--c-valid)"></i>B2C Valid</span><span><i class="line" style="background:var(--c-invalid)"></i>B2C Invalid</span></div></div>
+        <div class="chart-box"><canvas id="lineChart" aria-label="Monthly valid and invalid leads line chart"></canvas></div>
+      </article>
+      <article class="card chart-card">
+        <div class="chart-head"><div><h3>Annual valid lead contribution</h3><p class="cap">Valid leads per month · hover for share of <span data-bind="selYear"></span> total</p></div>
+          <div class="legend"><span><i style="background:var(--brand)"></i>Selected month</span><span><i style="background:var(--c-valid-soft)"></i>Other months</span></div></div>
+        <div class="chart-box"><canvas id="barChart" aria-label="Valid leads per month bar chart"></canvas></div>
+      </article>
+    </div>
+  </section>
+
+  <section aria-labelledby="annH">
+    <div class="sec-h"><h2 id="annH">Annual summary · <span data-bind="selYear"></span></h2><span class="note" data-bind="annNote"></span></div>
+    <div class="card">
+      <div class="ann-stats">
+        <div><div class="lbl">Total valid leads</div><div class="val num" data-bind="aValid"></div></div>
+        <div><div class="lbl">Total invalid leads</div><div class="val num" data-bind="aInvalid"></div></div>
+        <div><div class="lbl">Total leads</div><div class="val num" data-bind="aTotal"></div></div>
+        <div><div class="lbl">Overall valid lead rate</div><div class="val num" data-bind="aRate"></div></div>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Month</th><th>Valid</th><th>Invalid</th><th>Total</th><th>Valid rate</th><th>Annual valid share</th></tr></thead>
+        <tbody id="annBody"></tbody><tfoot id="annFoot"></tfoot>
+      </table></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="cmpH">
+    <div class="sec-h"><h2 id="cmpH">Compare months</h2><span class="note">Change is calculated as Month B − Month A</span></div>
+    <div class="card">
+      <div class="cmp-pick">
+        <div class="field"><label for="cmpA">Month A</label><select id="cmpA" class="ctl"></select></div>
+        <div class="vs"><button class="btn sm" id="cmpSwap" type="button" aria-label="Swap months A and B">⇄ Swap</button></div>
+        <div class="field"><label for="cmpB">Month B</label><select id="cmpB" class="ctl"></select></div>
+      </div>
+      <div class="tbl-wrap"><table class="cmp-table">
+        <thead><tr><th>Metric</th><th data-bind="cmpAh"></th><th data-bind="cmpBh"></th><th>Absolute change</th><th>% change</th></tr></thead>
+        <tbody id="cmpBody"></tbody>
+      </table></div>
+      <div class="cmp-note">Valid rate change is shown in percentage points (pp); its % change is relative to Month A's rate.</div>
+    </div>
+  </section>
+
+  <section aria-labelledby="dataH">
+    <div class="sec-h"><h2 id="dataH">Detailed data</h2><span class="note">Click a row to select that month · click a column header to sort</span></div>
+    <div class="card">
+      <div class="tbl-tools">
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <label for="tblSearch" class="sr">Filter table</label><input id="tblSearch" class="ctl" type="search" placeholder="Filter rows, e.g. Aug, 2024, 8/1/2025"></div>
+        <label for="tblYear" class="sr">Filter by year</label><select id="tblYear" class="ctl" style="width:auto"></select>
+        <span class="count num" id="tblCount"></span>
+      </div>
+      <div class="tbl-scroll"><table>
+        <thead><tr id="tblHead"></tr></thead>
+        <tbody id="tblBody"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="dqH">
+    <h2 id="dqH" class="sr">Data quality and source</h2>
+    <details class="card dq" id="dq">
+      <summary><span>Data validation &amp; source</span><span data-bind="dqChips" style="display:contents"></span><span class="chev" aria-hidden="true">▾</span></summary>
+      <div class="dq-body" data-bind="dqBody"></div>
+    </details>
+  </section>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+/* =====================================================================
+   DATA SOURCE CONFIGURATION
+   ---------------------------------------------------------------------
+   SHEET_CSV_URL is the ONLY value you need to change to point this
+   dashboard at another sheet or tab. It uses the Google Visualization
+   CSV endpoint, which allows cross-origin reads for sheets shared as
+   "Anyone with the link can view":
+     https://docs.google.com/spreadsheets/d/<SHEET_ID>/gviz/tq?tqx=out:csv&gid=<TAB_GID>
+   A "File > Share > Publish to web > CSV" link also works here.
+   ===================================================================== */
+const CONFIG = {
+  SHEET_CSV_URL: 'https://docs.google.com/spreadsheets/d/1atmIq7RGEySBZ1DhlbaYDksS3UQbxCp1DxWTHjjLIOU/gviz/tq?tqx=out:csv&gid=0',
+  SHEET_EDIT_URL: 'https://docs.google.com/spreadsheets/d/1atmIq7RGEySBZ1DhlbaYDksS3UQbxCp1DxWTHjjLIOU/edit',
+  FETCH_TIMEOUT_MS: 8000,
+  AUTO_REFRESH_MINUTES: 15   // re-pull the sheet while the page is open; 0 disables
+};
+
+/* Offline fallback: an exact, unmodified copy of the sheet's CSV export, taken at
+   SNAPSHOT.takenAt. Used ONLY when the live fetch above is blocked or fails
+   (for example inside a sandboxed viewer). The status pill always says which one is shown. */
+const SNAPSHOT = {
+  takenAt: '2026-09-26T06:33:50Z',
+  csv: `Date ,B2C Valid ,B2C Invalid
+8/1/2021,2890,149
+9/1/2021,2247,168
+10/1/2021,1763,158
+11/1/2021,1411,114
+12/1/2021,1761,184
+1/1/2022,3066,206
+2/1/2022,1981,195
+3/1/2022,2309,199
+4/1/2022,2159,256
+5/1/2022,2214,255
+6/1/2022,2328,7401
+7/1/2022,2268,332
+8/1/2022,1864,351
+9/1/2022,1784,363
+10/1/2022,1356,340
+11/1/2022,1575,411
+12/1/2022,1481,365
+1/1/2023,1820,450
+2/1/2023,1801,432
+3/1/2023,2145,380
+4/1/2023,2332,426
+5/1/2023,2210,553
+6/1/2023,1760,464
+7/1/2023,1562,569
+8/1/2023,1534,479
+9/1/2023,1292,600
+10/1/2023,1441,460
+11/1/2023,1423,531
+12/1/2023,1663,577
+1/1/2024,1643,729
+2/1/2024,1528,625
+3/1/2024,2207,677
+4/1/2024,2041,647
+5/1/2024,2151,571
+6/1/2024,2236,519
+7/1/2024,2092,739
+8/1/2024,1751,562
+9/1/2024,1656,465
+10/1/2024,1367,386
+11/1/2024,1046,401
+12/1/2024,1458,669
+1/1/2025,1985,1680
+2/1/2025,1689,2447
+3/1/2025,1438,1767
+4/1/2025,1507,1351
+5/1/2025,1298,1655
+6/1/2025,1247,1316
+7/1/2025,1349,1271
+8/1/2025,1481,1608
+9/1/2025,1455,1384
+10/1/2025,1251,1569
+11/1/2025,1326,1367
+12/1/2025,1240,1733
+1/1/2026,1345,1552
+2/1/2026,1422,730
+3/1/2026,2299,775
+4/1/2026,2525,1052
+5/1/2026,2228,1405
+6/1/2026,1661,1330
+7/1/2026,1272,1243
+8/1/2026,1202,889`
+};
+
+(function(){
+'use strict';
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MON = MONTHS.map(m => m.slice(0,3));
+const $ = id => document.getElementById(id);
+const fmtN = n => (n == null || !isFinite(n)) ? '—' : Math.round(n).toLocaleString('en-US');
+const fmtP = p => (p == null || !isFinite(p)) ? '—' : p.toFixed(2) + '%';
+const sgnN = n => (n == null || !isFinite(n)) ? '—' : (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const sgnP = (p, unit='%') => (p == null || !isFinite(p)) ? '—' : (p > 0 ? '+' : p < 0 ? '−' : '') + Math.abs(p).toFixed(2) + unit;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const keyOf = (y, m) => y + '-' + String(m + 1).padStart(2, '0');
+const labelOf = (y, m) => MONTHS[m] + ' ' + y;
+const pct = (a, b) => b ? a / b * 100 : null;
+
+const S = {
+  records: [], byKey: new Map(), years: [], issues: [], dupes: [], rowsRead: 0,
+  source: null, sel: null, cmp: null,
+  tbl: { q: '', year: 'all', sort: 'key', dir: -1 },
+  charts: {}, built: false, timer: null
+};
+
+/* ---------- CSV parsing & validation ---------- */
+function parseCSV(text){
+  const rows = []; let row = [], cur = '', q = false;
+  text = text.replace(/^﻿/, '');
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){
+      if (c === '"'){ if (text[i+1] === '"'){ cur += '"'; i++; } else q = false; }
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r'){ if (c === '\r' && text[i+1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; }
+    else cur += c;
+  }
+  if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+function parseDateCell(v){
+  v = String(v || '').trim(); if (!v) return null;
+  let m;
+  if ((m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/))){ // M/D/YYYY (US, as used by the sheet)
+    let y = +m[3]; if (y < 100) y += 2000; const mo = +m[1] - 1, d = +m[2];
+    if (mo < 0 || mo > 11 || d < 1 || d > 31) return null; return { y, m: mo };
+  }
+  if ((m = v.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?/))){ const mo = +m[2] - 1; if (mo < 0 || mo > 11) return null; return { y: +m[1], m: mo }; }
+  if ((m = v.match(/^Date\((\d{4}),(\d{1,2})/))) return { y: +m[1], m: +m[2] }; // gviz JSON style, month is 0-based
+  if (/^\d{5}$/.test(v)){ const d = new Date(Date.UTC(1899, 11, 30) + (+v) * 864e5); return { y: d.getUTCFullYear(), m: d.getUTCMonth() }; }
+  const q = parseMonthQuery(v); if (q) return q;
+  return null;
+}
+function parseNumCell(v){
+  const s = String(v == null ? '' : v).trim().replace(/[,\s]/g, '');
+  if (s === '' || s === '-') return { missing: true, n: 0 };
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return { bad: true };
+  return { n: +s };
+}
+function ingest(input, source){
+  const rows = (typeof input === 'string' ? parseCSV(input) : input).filter(r => r.some(c => String(c).trim() !== ''));
+  if (!rows.length) throw new Error('The sheet returned no rows.');
+  const head = rows[0].map(h => String(h).trim().toLowerCase());
+  let iDate = head.findIndex(h => h.includes('date') || h === 'month');
+  let iValid = head.findIndex(h => /valid/.test(h) && !/invalid/.test(h));
+  let iInvalid = head.findIndex(h => /invalid/.test(h));
+  let start = 1;
+  if (iDate < 0 || iValid < 0 || iInvalid < 0){
+    if (parseDateCell(rows[0][0])) { start = 0; } // no header row — fall back to columns A/B/C
+    iDate = 0; iValid = 1; iInvalid = 2;
+    if (start === 1 && !/date/.test(head[0] || '')) throw new Error('Could not find the Date / B2C Valid / B2C Invalid columns. The response may be a sign-in page rather than CSV.');
+  }
+  const issues = [], groups = new Map();
+  let read = 0;
+  for (let r = start; r < rows.length; r++){
+    const row = rows[r], sheetRow = r + 1; read++;
+    const rawDate = String(row[iDate] || '').trim();
+    const d = parseDateCell(rawDate);
+    if (!d){ issues.push({ level: 'error', msg: `Sheet row ${sheetRow}: date "${rawDate || '(blank)'}" is not a valid date — row not included.` }); continue; }
+    const v = parseNumCell(row[iValid]), iv = parseNumCell(row[iInvalid]);
+    if (v.bad || iv.bad){ issues.push({ level: 'error', msg: `Sheet row ${sheetRow} (${labelOf(d.y, d.m)}): ${v.bad ? `B2C Valid "${row[iValid]}"` : `B2C Invalid "${row[iInvalid]}"`} is not a number — row not included.` }); continue; }
+    if (v.missing && iv.missing){ issues.push({ level: 'info', msg: `Sheet row ${sheetRow} (${labelOf(d.y, d.m)}): no lead numbers entered yet — month not shown until values are added.` }); continue; }
+    if (v.missing) issues.push({ level: 'warn', msg: `Sheet row ${sheetRow} (${labelOf(d.y, d.m)}): B2C Valid is blank — counted as 0.` });
+    if (iv.missing) issues.push({ level: 'warn', msg: `Sheet row ${sheetRow} (${labelOf(d.y, d.m)}): B2C Invalid is blank — counted as 0.` });
+    if (v.n < 0 || iv.n < 0) issues.push({ level: 'warn', msg: `Sheet row ${sheetRow} (${labelOf(d.y, d.m)}): negative value present.` });
+    const k = keyOf(d.y, d.m);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push({ sheetRow, rawDate, valid: v.n, invalid: iv.n, y: d.y, m: d.m });
+  }
+  const records = [], dupes = [];
+  for (const [k, list] of groups){
+    const first = list[0];
+    const valid = list.reduce((s, x) => s + x.valid, 0), invalid = list.reduce((s, x) => s + x.invalid, 0);
+    if (list.length > 1){
+      const identical = list.every(x => x.valid === first.valid && x.invalid === first.invalid);
+      dupes.push({ key: k, label: labelOf(first.y, first.m), rows: list, identical });
+    }
+    records.push({ key: k, y: first.y, m: first.m, rawDate: first.rawDate, sheetRows: list.map(x => x.sheetRow),
+      valid, invalid, total: valid + invalid, rate: pct(valid, valid + invalid), dup: list.length > 1 });
+  }
+  if (!records.length) throw new Error('No valid monthly rows were found in the sheet.');
+  records.sort((a, b) => a.key < b.key ? -1 : 1);
+  // annual totals & shares
+  const years = new Map();
+  for (const r of records){
+    if (!years.has(r.y)) years.set(r.y, { y: r.y, valid: 0, invalid: 0, months: 0 });
+    const Y = years.get(r.y); Y.valid += r.valid; Y.invalid += r.invalid; Y.months++;
+  }
+  for (const r of records) r.share = pct(r.valid, years.get(r.y).valid);
+  S.records = records; S.byKey = new Map(records.map(r => [r.key, r]));
+  S.yearsMap = years; S.years = [...years.keys()].sort((a, b) => a - b);
+  S.issues = issues; S.dupes = dupes; S.rowsRead = read; S.source = source;
+}
+const yearAgg = y => { const Y = S.yearsMap.get(y); return Y ? { ...Y, total: Y.valid + Y.invalid, rate: pct(Y.valid, Y.valid + Y.invalid) } : null; };
+const latest = () => S.records[S.records.length - 1];
+
+/* ---------- month search parsing ---------- */
+function monthIdx(word){
+  word = word.toLowerCase().replace(/\.$/, '');
+  if (word.length < 3) return -1;
+  return MONTHS.findIndex(m => m.toLowerCase().startsWith(word));
+}
+function fixYear(s){ let y = +s; if (s.length === 2) y += 2000; return y; }
+function parseMonthQuery(q){
+  q = String(q).trim().toLowerCase().replace(/,/g, ' ').replace(/\s+/g, ' ');
+  let m, y, mo = -1;
+  if ((m = q.match(/^(\d{4})\s?[-\/.]\s?(\d{1,2})$/))) { y = +m[1]; mo = +m[2] - 1; }
+  else if ((m = q.match(/^(\d{1,2})\s?[-\/.]\s?(\d{4})$/))) { y = +m[2]; mo = +m[1] - 1; }
+  else if ((m = q.match(/^(\d{1,2})[-\/.]\d{1,2}[-\/.](\d{4})$/))) { y = +m[2]; mo = +m[1] - 1; }
+  else if ((m = q.match(/^([a-z]+\.?)\s?[-\/']?\s?(\d{4}|\d{2})$/))) { mo = monthIdx(m[1]); y = fixYear(m[2]); }
+  else if ((m = q.match(/^(\d{4})\s?[-\/]?\s?([a-z]+\.?)$/))) { mo = monthIdx(m[2]); y = +m[1]; }
+  else return null;
+  if (mo < 0 || mo > 11 || !y) return null;
+  return { y, m: mo };
+}
+
+/* ---------- theme helpers ---------- */
+function tok(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function applyChartDefaults(){
+  if (!window.Chart) return;
+  Chart.defaults.font.family = tok('--font') || 'system-ui';
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = tok('--muted');
+  Chart.defaults.borderColor = tok('--grid');
+}
+function tooltipStyle(){
+  return { backgroundColor: tok('--surface'), titleColor: tok('--ink'), bodyColor: tok('--ink-2'), borderColor: tok('--border-strong'), borderWidth: 1,
+    padding: 10, cornerRadius: 8, boxPadding: 4, titleFont: { weight: '700' }, usePointStyle: true };
+}
+
+/* ---------- binding ---------- */
+function bind(name, html){ document.querySelectorAll(`[data-bind="${name}"]`).forEach(el => { el.innerHTML = html; }); }
+
+/* ---------- status ---------- */
+function setStatus(kind, text, meta){
+  const p = $('statusPill'); p.dataset.kind = kind; $('statusText').textContent = text;
+  if (meta != null) $('statusMeta').innerHTML = meta;
+}
+const fmtTime = d => d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+/* ---------- load ---------- */
+async function fetchSheet(){
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), CONFIG.FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(CONFIG.SHEET_CSV_URL, { cache: 'no-store', signal: ctl.signal });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.text();
+  } finally { clearTimeout(t); }
+}
+/* Second route to the same sheet: the gviz JSONP response. It needs no CORS, so it also
+   works when the file is opened straight from disk (file://). Derived from SHEET_CSV_URL. */
+function fetchSheetJsonp(){
+  return new Promise((resolve, reject) => {
+    const cb = '__stownestSheet' + Date.now(), s = document.createElement('script');
+    const t = setTimeout(() => { done(); reject(new Error('request timed out')); }, CONFIG.FETCH_TIMEOUT_MS);
+    function done(){ clearTimeout(t); try { delete window[cb]; } catch (_){} s.remove(); }
+    window[cb] = resp => {
+      done();
+      if (!resp || resp.status === 'error' || !resp.table) return reject(new Error('sheet returned an error'));
+      const cols = resp.table.cols || [];
+      const rows = [cols.map(c => c.label || '')].concat((resp.table.rows || []).map(r => (r.c || []).map((cell, i) => {
+        if (!cell) return '';
+        return cols[i] && cols[i].type === 'number' ? (cell.v == null ? '' : String(cell.v)) : (cell.f != null ? cell.f : (cell.v == null ? '' : String(cell.v)));
+      })));
+      resolve(rows);
+    };
+    s.onerror = () => { done(); reject(new Error('request blocked')); };
+    const u = CONFIG.SHEET_CSV_URL.replace(/tqx=out:csv/, 'tqx=out:json;responseHandler:' + cb);
+    s.src = u + (u === CONFIG.SHEET_CSV_URL ? '' : '&_=' + Date.now());
+    if (u === CONFIG.SHEET_CSV_URL) { done(); return reject(new Error('JSONP route needs a gviz URL')); }
+    document.head.appendChild(s);
+  });
+}
+async function load(){
+  setStatus('loading', 'Connecting to Google Sheet…');
+  $('refreshBtn').disabled = true;
+  try {
+    let data;
+    try { data = await fetchSheet(); } catch (e1){ data = await fetchSheetJsonp(); }
+    const wasLatest = !S.sel || !S.records.length || S.sel.key === latest().key;
+    ingest(data, { kind: 'live', at: new Date() });
+    if (wasLatest) S.sel = null; // new month added to the sheet: follow it
+    setStatus('live', 'Data Connected', `Last Updated: ${fmtTime(S.source.at)} · live from Google Sheet`);
+  } catch (e){
+    const msg = e && e.name === 'AbortError' ? 'request timed out' : (e && e.message) || 'request blocked';
+    if (S.source && S.source.kind !== 'snapshot'){
+      setStatus('error', 'Refresh failed — showing last loaded data', `Last Updated: ${fmtTime(S.source.at)} · live fetch failed (${esc(msg)})`);
+    } else {
+      try {
+        ingest(SNAPSHOT.csv, { kind: 'snapshot', at: new Date(SNAPSHOT.takenAt), error: msg });
+        setStatus('snapshot', 'Sheet snapshot — live link unavailable here', `Last Updated: ${fmtTime(S.source.at)} · snapshot of the Google Sheet`);
+      } catch (e2){ showFatal(e2.message); return; }
+    }
+  } finally { $('refreshBtn').disabled = false; }
+  render();
+  scheduleRefresh();
+}
+function scheduleRefresh(){
+  clearInterval(S.timer);
+  if (CONFIG.AUTO_REFRESH_MINUTES > 0 && S.source && S.source.kind === 'live')
+    S.timer = setInterval(load, CONFIG.AUTO_REFRESH_MINUTES * 60000);
+}
+function showFatal(msg){
+  setStatus('error', 'Data not loaded', 'Check the sheet sharing settings or SHEET_CSV_URL');
+  $('main').innerHTML = `<div class="card empty"><b>The lead data could not be read.</b>${esc(msg)}<br>Make sure the sheet is shared as “Anyone with the link can view”, then use Refresh data, or load a CSV export with Load CSV.</div>`;
+}
+
+/* ---------- selection ---------- */
+function select(y, m, opts = {}){
+  const k = keyOf(y, m);
+  if (!S.byKey.has(k)) return false;
+  S.sel = { y, m, key: k };
+  if (!opts.keepHint) $('fhint').className = 'fhint';
+  if (!opts.keepSearch) $('searchBox').value = '';
+  render();
+  return true;
+}
+function range(){ const a = S.records[0], b = latest(); return `${MON[a.m]} ${a.y} – ${MON[b.m]} ${b.y}`; }
+function hint(text, cls = ''){ const h = $('fhint'); h.className = 'fhint ' + cls; h.textContent = text; }
+
+/* ---------- render ---------- */
+function render(){
+  if (!S.records.length) return;
+  if (!S.built){
+    const main = $('main'); main.innerHTML = ''; main.appendChild($('dashTpl').content.cloneNode(true));
+    wireDash(); S.built = true;
+  }
+  if (!S.sel || !S.byKey.has(S.sel.key)){ const l = latest(); S.sel = { y: l.y, m: l.m, key: l.key }; }
+  if (!S.cmp || !S.byKey.has(S.cmp.a) || !S.byKey.has(S.cmp.b)) initCompare();
+  renderFilters(); renderBanners(); renderKPIs(); renderMonth(); renderAnnual(); renderCompare(); renderTable(); renderDQ();
+  renderCharts();
+}
+
+function renderFilters(){
+  const { y, m } = S.sel;
+  $('yearSel').innerHTML = S.years.slice().reverse().map(yr => `<option value="${yr}"${yr === y ? ' selected' : ''}>${yr}</option>`).join('');
+  $('monthSel').innerHTML = MONTHS.map((name, i) => {
+    const has = S.byKey.has(keyOf(y, i));
+    return `<option value="${i}"${i === m ? ' selected' : ''}${has ? '' : ' disabled'}>${name}${has ? '' : ' (no data)'}</option>`;
+  }).join('');
+  $('monthList').innerHTML = S.records.slice().reverse().map(r => `<option value="${labelOf(r.y, r.m)}"></option>`).join('');
+  const pk = $('picker'), f = S.records[0], l = latest();
+  pk.min = keyOf(f.y, f.m); pk.max = keyOf(l.y, l.m); pk.value = S.sel.key;
+  if (!$('fhint').classList.contains('err')) hint(`Showing ${labelOf(y, m)} · data available ${range()} (${S.records.length} months)`);
+}
+
+function renderBanners(){
+  const out = [];
+  if (S.dupes.length){
+    out.push(`<div class="banner" role="alert"><span>⚠</span><div><b>Duplicate month records found.</b> ${S.dupes.map(d => `${esc(d.label)} appears ${d.rows.length}× (sheet rows ${d.rows.map(r => r.sheetRow).join(', ')}${d.identical ? ', identical values — check whether this is a repeated entry' : ''})`).join('; ')}. These rows are summed into one month in every figure below. If they are repeated entries rather than separate lead records, correct the sheet and refresh.</div></div>`);
+  }
+  const errs = S.issues.filter(i => i.level === 'error').length;
+  if (errs) out.push(`<div class="banner" role="alert"><span>⚠</span><div><b>${errs} row${errs > 1 ? 's' : ''} could not be read</b> and ${errs > 1 ? 'are' : 'is'} not included. See “Data validation &amp; source” at the bottom of the page.</div></div>`);
+  if (S.source.kind === 'snapshot') out.push(`<div class="banner"><span>ℹ</span><div><b>Showing a snapshot of the Google Sheet</b> taken ${fmtTime(S.source.at)}. The live request did not succeed here (${esc(S.source.error || 'blocked')}). Check your connection and use Refresh data, or use Load CSV with a fresh export.</div></div>`);
+  if (S.source.kind === 'file') out.push(`<div class="banner"><span>ℹ</span><div><b>Showing data from ${esc(S.source.name)}</b>, loaded ${fmtTime(S.source.at)}. Use Refresh data to return to the Google Sheet.</div></div>`);
+  const b = $('banners'); b.innerHTML = out.join(''); b.style.display = out.length ? 'grid' : 'none'; b.style.gap = '10px';
+}
+
+function yearMonths(y){ return MONTHS.map((_, i) => S.byKey.get(keyOf(y, i)) || null); }
+
+function renderKPIs(){
+  const r = S.byKey.get(S.sel.key), Y = yearAgg(r.y), label = labelOf(r.y, r.m);
+  bind('selLabel', esc(label)); bind('selYear', r.y);
+  const partial = Y.months < 12;
+  bind('kpiNote', partial ? `${r.y} has ${Y.months} of 12 months recorded, so annual totals cover those months only` : '');
+  bind('shareBig', r.share == null ? '—' : `${r.share.toFixed(2)}<small>%</small>`);
+  bind('shareDesc', `<b>${fmtN(r.valid)}</b> of <b>${fmtN(Y.valid)}</b> valid leads recorded in ${r.y} came in ${MONTHS[r.m]}.`);
+  const ms = yearMonths(r.y);
+  const strip = $('shareStrip');
+  strip.innerHTML = ms.map((x, i) => x ? `<span style="flex:${Math.max(x.valid, 0)} 1 0" class="${i === r.m ? 'on' : ''}" data-m="${i}" title="${MONTHS[i]} ${r.y}: ${fmtN(x.valid)} valid · ${fmtP(x.share)}"></span>` : '').join('');
+  strip.setAttribute('aria-label', `Share of ${r.y} valid leads by month; ${MONTHS[r.m]} is highlighted at ${fmtP(r.share)}`);
+  const present = ms.filter(Boolean);
+  bind('stripEnd', MON[present[present.length - 1].m]);
+  document.querySelector('.strip-axis span').textContent = MON[present[0].m];
+  const rank = present.slice().sort((a, b) => b.valid - a.valid).findIndex(x => x.key === r.key) + 1;
+  bind('heroMeta', `<span class="chip num">Rank ${rank} of ${present.length} months in ${r.y} by valid leads</span>${partial ? `<span class="chip warn">Partial year · ${Y.months} of 12 months</span>` : `<span class="chip">Full year · 12 months</span>`}`);
+  bind('kValid', fmtN(r.valid)); bind('kInvalid', fmtN(r.invalid)); bind('kTotal', fmtN(r.total)); bind('kRate', fmtP(r.rate));
+  bind('kValidFoot', `B2C Valid · ${esc(label)}`); bind('kInvalidFoot', `B2C Invalid · ${esc(label)}`);
+  bind('kAnnValid', fmtN(Y.valid)); bind('kAnnInvalid', fmtN(Y.invalid)); bind('kAnnTotal', fmtN(Y.total));
+  bind('kAnnFoot', partial ? `Sum of ${Y.months} recorded months (${MON[present[0].m]}–${MON[present[present.length - 1].m]})` : 'Sum of all 12 months');
+}
+
+function renderMonth(){
+  const r = S.byKey.get(S.sel.key);
+  bind('monthTitle', esc(labelOf(r.y, r.m)));
+  bind('monthSrc', `Sheet date ${esc(r.rawDate)} · row ${r.sheetRows.join(' + ')}${r.dup ? ' (duplicates summed)' : ''}`);
+  bind('mValid', fmtN(r.valid)); bind('mInvalid', fmtN(r.invalid)); bind('mTotal', fmtN(r.total)); bind('mRate', fmtP(r.rate));
+  bind('mShareLbl', `Share of ${r.y} Annual Valid Leads`); bind('mShare', fmtP(r.share));
+  bind('donutRate', fmtP(r.rate)); bind('lgValid', fmtN(r.valid)); bind('lgInvalid', fmtN(r.invalid));
+}
+
+function renderAnnual(){
+  const y = S.sel.y, Y = yearAgg(y), ms = yearMonths(y);
+  bind('aValid', fmtN(Y.valid)); bind('aInvalid', fmtN(Y.invalid)); bind('aTotal', fmtN(Y.total)); bind('aRate', fmtP(Y.rate));
+  bind('annNote', Y.months < 12 ? `${Y.months} of 12 months recorded` : 'All 12 months recorded');
+  bind('yrNote', Y.months < 12 ? `Months without data are left blank` : '');
+  const maxShare = Math.max(...ms.filter(Boolean).map(x => x.share || 0), 1);
+  $('annBody').innerHTML = ms.map((x, i) => x
+    ? `<tr class="click${x.key === S.sel.key ? ' sel' : ''}" data-key="${x.key}"><td>${MONTHS[i]}</td><td>${fmtN(x.valid)}</td><td>${fmtN(x.invalid)}</td><td>${fmtN(x.total)}</td><td>${fmtP(x.rate)}</td><td><span class="bar-cell"><u style="width:${(x.share / maxShare * 60).toFixed(1)}px"></u>${fmtP(x.share)}</span></td></tr>`
+    : `<tr class="nodata"><td>${MONTHS[i]}</td><td colspan="5" style="text-align:right">No data</td></tr>`).join('');
+  $('annFoot').innerHTML = `<tr><td>Total ${y}</td><td>${fmtN(Y.valid)}</td><td>${fmtN(Y.invalid)}</td><td>${fmtN(Y.total)}</td><td>${fmtP(Y.rate)}</td><td>${fmtP(Y.valid ? 100 : null)}</td></tr>`;
+}
+
+/* ---------- compare ---------- */
+function initCompare(){
+  const r = S.byKey.get(S.sel.key);
+  const prevYear = S.byKey.get(keyOf(r.y - 1, r.m));
+  const idx = S.records.indexOf(r);
+  const a = prevYear || S.records[Math.max(0, idx - 1)];
+  S.cmp = { a: a.key, b: r.key };
+}
+function renderCompare(){
+  const opts = sel => S.records.slice().reverse().map(r => `<option value="${r.key}"${r.key === sel ? ' selected' : ''}>${labelOf(r.y, r.m)}</option>`).join('');
+  $('cmpA').innerHTML = opts(S.cmp.a); $('cmpB').innerHTML = opts(S.cmp.b);
+  const A = S.byKey.get(S.cmp.a), B = S.byKey.get(S.cmp.b);
+  bind('cmpAh', `A · ${esc(labelOf(A.y, A.m))}`); bind('cmpBh', `B · ${esc(labelOf(B.y, B.m))}`);
+  const row = (name, a, b, isRate) => {
+    const d = b - a, rel = a ? d / a * 100 : null;
+    return `<tr><td>${name}</td><td>${isRate ? fmtP(a) : fmtN(a)}</td><td>${isRate ? fmtP(b) : fmtN(b)}</td><td class="d">${isRate ? sgnP(d, ' pp') : sgnN(d)}</td><td class="d">${sgnP(rel)}</td></tr>`;
+  };
+  $('cmpBody').innerHTML = row('Valid Leads', A.valid, B.valid) + row('Invalid Leads', A.invalid, B.invalid) + row('Total Leads', A.total, B.total) + row('Valid Rate', A.rate, B.rate, true)
+    + row(`Share of annual valid`, A.share, B.share, true);
+}
+
+/* ---------- detail table ---------- */
+const COLS = [
+  { k: 'key', t: 'Date', f: r => esc(r.rawDate) + (r.dup ? ' <span class="chip warn">dup</span>' : '') },
+  { k: 'm', t: 'Month', f: r => MONTHS[r.m] },
+  { k: 'y', t: 'Year', f: r => r.y },
+  { k: 'valid', t: 'B2C Valid', f: r => fmtN(r.valid) },
+  { k: 'invalid', t: 'B2C Invalid', f: r => fmtN(r.invalid) },
+  { k: 'total', t: 'Total Leads', f: r => fmtN(r.total) },
+  { k: 'rate', t: 'Valid Lead Rate', f: r => fmtP(r.rate) },
+  { k: 'share', t: 'Annual Valid Share', f: r => fmtP(r.share) }
+];
+function renderTable(){
+  const T = S.tbl;
+  $('tblHead').innerHTML = COLS.map(c => `<th><button class="th-btn" data-sort="${c.k}" type="button"${T.sort === c.k ? ` aria-sort="${T.dir > 0 ? 'ascending' : 'descending'}"` : ''}>${c.t}<span class="arr">${T.sort === c.k ? (T.dir > 0 ? '▲' : '▼') : '↕'}</span></button></th>`).join('');
+  const ys = $('tblYear');
+  ys.innerHTML = `<option value="all">All years</option>` + S.years.slice().reverse().map(y => `<option value="${y}"${String(y) === T.year ? ' selected' : ''}>${y}</option>`).join('');
+  const q = T.q.trim().toLowerCase();
+  let rows = S.records.filter(r => (T.year === 'all' || String(r.y) === T.year) &&
+    (!q || [r.rawDate, MONTHS[r.m], MON[r.m], r.y, labelOf(r.y, r.m), r.key, `${String(r.m + 1).padStart(2, '0')}/${r.y}`].join(' ').toLowerCase().includes(q)));
+  rows.sort((a, b) => { const x = a[T.sort], y = b[T.sort]; return (x < y ? -1 : x > y ? 1 : (a.key < b.key ? -1 : 1)) * T.dir; });
+  $('tblBody').innerHTML = rows.length ? rows.map(r => `<tr class="click${r.key === S.sel.key ? ' sel' : ''}" data-key="${r.key}" tabindex="0">${COLS.map(c => `<td>${c.f(r)}</td>`).join('')}</tr>`).join('')
+    : `<tr><td colspan="${COLS.length}" style="text-align:center;color:var(--muted);padding:24px">No rows match “${esc(T.q)}”.</td></tr>`;
+  $('tblCount').textContent = `${rows.length} of ${S.records.length} months`;
+}
+
+/* ---------- data quality ---------- */
+function renderDQ(){
+  const errs = S.issues.filter(i => i.level === 'error'), warns = S.issues.filter(i => i.level === 'warn');
+  const src = S.source;
+  const srcName = src.kind === 'live' ? 'Live Google Sheet' : src.kind === 'snapshot' ? `Snapshot of Google Sheet (${fmtTime(src.at)})` : `Local file: ${esc(src.name)}`;
+  bind('dqChips', `<span class="chip num">${S.rowsRead} rows read</span><span class="chip num">${S.records.length} months</span>`
+    + `<span class="chip ${S.dupes.length ? 'warn' : ''} num">${S.dupes.length} duplicate months</span>`
+    + `<span class="chip ${errs.length ? 'warn' : ''} num">${errs.length} excluded rows</span>`
+    + `<span class="chip ${warns.length ? 'warn' : ''} num">${warns.length} warnings</span>`);
+  const checks = [
+    `Dates: ${errs.some(e => /date/.test(e.msg)) ? 'some invalid dates found (listed below)' : 'all dates parsed as month/year (M/D/YYYY, day ignored)'}`,
+    `B2C Valid / B2C Invalid: ${errs.some(e => /not a number/.test(e.msg)) ? 'some non-numeric values (listed below)' : 'all values numeric'}`,
+    `Missing values: ${warns.filter(w => /blank/.test(w.msg)).length ? warns.filter(w => /blank/.test(w.msg)).length + ' blank cells counted as 0' : 'none'}`,
+    `Duplicate months: ${S.dupes.length ? S.dupes.map(d => d.label).join(', ') + ' — summed, see warning at top' : 'none'}`,
+    `Coverage: ${range()}; ${S.years.map(y => `${y}: ${S.yearsMap.get(y).months}/12`).join(' · ')}`
+  ];
+  const list = S.issues.length ? `<div><b>Row-level messages</b><ul>${S.issues.map(i => `<li>${esc(i.msg)}</li>`).join('')}</ul></div>` : '';
+  bind('dqBody', `<div><b>Source:</b> ${srcName}${src.kind === 'snapshot' ? ` — live request unavailable (${esc(src.error || '')})` : ''}</div>
+    <div><b>Checks</b><ul>${checks.map(c => `<li>${c}</li>`).join('')}</ul></div>${list}
+    <div><b>Connecting a different sheet</b><br>Change <code>CONFIG.SHEET_CSV_URL</code> at the top of the page script. The sheet must be shared as “Anyone with the link can view”, with columns Date, B2C Valid, B2C Invalid.</div>
+    <div class="cfg">SHEET_CSV_URL: '${esc(CONFIG.SHEET_CSV_URL)}'</div>
+    <div>Sheet: <a href="${esc(CONFIG.SHEET_EDIT_URL)}" target="_blank" rel="noopener" style="color:var(--brand-ink)">open in Google Sheets</a></div>`);
+}
+
+/* ---------- charts ---------- */
+function renderCharts(){
+  if (!window.Chart){ document.querySelectorAll('.chart-box').forEach(b => b.innerHTML = '<div class="empty">Charts could not load (Chart.js unavailable). All figures remain in the tables.</div>'); return; }
+  applyChartDefaults();
+  const r = S.byKey.get(S.sel.key), y = r.y, ms = yearMonths(y), Y = yearAgg(y);
+  const cV = tok('--c-valid'), cI = tok('--c-invalid'), cSoft = tok('--c-valid-soft'), cBrand = tok('--brand'), surf = tok('--surface'), grid = tok('--grid'), ink2 = tok('--ink-2');
+  const tt = tooltipStyle();
+  const scalesY = { beginAtZero: true, grid: { color: grid, drawTicks: false }, border: { display: false }, ticks: { padding: 8, callback: v => Number(v).toLocaleString('en-US') } };
+  const scalesX = { grid: { display: false }, border: { color: tok('--border-strong') }, ticks: { color: ink2 } };
+
+  // Donut
+  const dData = [r.valid, r.invalid];
+  if (S.charts.donut){ S.charts.donut.data.datasets[0].data = dData; S.charts.donut.data.datasets[0].backgroundColor = [cV, cI]; S.charts.donut.data.datasets[0].borderColor = surf; S.charts.donut.options.plugins.tooltip = { ...tt, callbacks: donutCb() }; S.charts.donut.update(); }
+  else S.charts.donut = new Chart($('donut'), { type: 'doughnut',
+    data: { labels: ['B2C Valid', 'B2C Invalid'], datasets: [{ data: dData, backgroundColor: [cV, cI], borderColor: surf, borderWidth: 2, hoverOffset: 4 }] },
+    options: { cutout: '72%', maintainAspectRatio: false, animation: { duration: 250 }, plugins: { legend: { display: false }, tooltip: { ...tt, callbacks: donutCb() } } } });
+  function donutCb(){ return { label: c => ` ${c.label}: ${fmtN(c.raw)} (${fmtP(pct(c.raw, r.total))})` }; }
+
+  // Line
+  const lv = ms.map(x => x ? x.valid : null), li = ms.map(x => x ? x.invalid : null);
+  const radius = ms.map((x, i) => i === r.m ? 6 : 3);
+  const lineCfg = {
+    type: 'line',
+    data: { labels: MON, datasets: [
+      { label: 'B2C Valid', data: lv, borderColor: cV, backgroundColor: cV, pointBackgroundColor: cV, pointBorderColor: surf, pointBorderWidth: 2, pointRadius: radius, pointHoverRadius: 7, borderWidth: 2, tension: .25, spanGaps: false },
+      { label: 'B2C Invalid', data: li, borderColor: cI, backgroundColor: cI, pointBackgroundColor: cI, pointBorderColor: surf, pointBorderWidth: 2, pointRadius: radius, pointHoverRadius: 7, borderWidth: 2, tension: .25, spanGaps: false }
+    ]},
+    options: { maintainAspectRatio: false, animation: { duration: 250 }, interaction: { mode: 'index', intersect: false },
+      scales: { y: scalesY, x: scalesX },
+      plugins: { legend: { display: false }, tooltip: { ...tt, callbacks: {
+        title: items => `${MONTHS[items[0].dataIndex]} ${y}`,
+        label: c => ` ${c.dataset.label}: ${fmtN(c.raw)}`,
+        afterBody: items => { const x = ms[items[0].dataIndex]; return x ? [`Total: ${fmtN(x.total)}`, `Valid rate: ${fmtP(x.rate)}`] : []; }
+      } } } }
+  };
+  if (S.charts.line) S.charts.line.destroy();
+  S.charts.line = new Chart($('lineChart'), lineCfg);
+
+  // Bar
+  const bv = ms.map(x => x ? x.valid : null);
+  const colors = ms.map((x, i) => i === r.m ? cBrand : cSoft);
+  const barCfg = {
+    type: 'bar',
+    data: { labels: MON, datasets: [{ label: 'Valid leads', data: bv, backgroundColor: colors, hoverBackgroundColor: ms.map((x, i) => i === r.m ? cBrand : cV), borderRadius: 4, borderSkipped: 'start', maxBarThickness: 36, categoryPercentage: .8, barPercentage: .9 }] },
+    options: { maintainAspectRatio: false, animation: { duration: 250 },
+      scales: { y: scalesY, x: scalesX },
+      onClick: (e, els) => { if (els.length) select(y, els[0].index); },
+      onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+      plugins: { legend: { display: false }, tooltip: { ...tt, displayColors: false, callbacks: {
+        title: items => `${MONTHS[items[0].dataIndex]} ${y}`,
+        label: c => `Valid leads: ${fmtN(c.raw)}`,
+        afterLabel: c => { const x = ms[c.dataIndex]; return x ? `Share of ${y} valid: ${fmtP(x.share)}\n(${fmtN(x.valid)} ÷ ${fmtN(Y.valid)} × 100)` : ''; }
+      } } } }
+  };
+  if (S.charts.bar) S.charts.bar.destroy();
+  S.charts.bar = new Chart($('barChart'), barCfg);
+}
+function rebuildChartsForTheme(){ Object.values(S.charts).forEach(c => c && c.destroy()); S.charts = {}; if (S.built) renderCharts(); }
+
+/* ---------- events ---------- */
+function wireDash(){
+  $('cmpA').addEventListener('change', e => { S.cmp.a = e.target.value; renderCompare(); });
+  $('cmpB').addEventListener('change', e => { S.cmp.b = e.target.value; renderCompare(); });
+  $('cmpSwap').addEventListener('click', () => { S.cmp = { a: S.cmp.b, b: S.cmp.a }; renderCompare(); });
+  $('tblSearch').addEventListener('input', e => { S.tbl.q = e.target.value; renderTable(); });
+  $('tblYear').addEventListener('change', e => { S.tbl.year = e.target.value; renderTable(); });
+  $('tblHead').addEventListener('click', e => {
+    const b = e.target.closest('[data-sort]'); if (!b) return;
+    const k = b.dataset.sort; if (S.tbl.sort === k) S.tbl.dir *= -1; else { S.tbl.sort = k; S.tbl.dir = (k === 'm' ? 1 : -1); }
+    renderTable(); const nb = document.querySelector(`[data-sort="${k}"]`); if (nb) nb.focus();
+  });
+  const pickRow = e => { const tr = e.target.closest('tr[data-key]'); if (!tr) return; const r = S.byKey.get(tr.dataset.key); if (r) { select(r.y, r.m); window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); } };
+  $('tblBody').addEventListener('click', pickRow);
+  $('tblBody').addEventListener('keydown', e => { if (e.key === 'Enter') pickRow(e); });
+  $('annBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-key]'); if (tr){ const r = S.byKey.get(tr.dataset.key); select(r.y, r.m); } });
+  $('shareStrip').addEventListener('click', e => { const s = e.target.closest('[data-m]'); if (s) select(S.sel.y, +s.dataset.m); });
+}
+$('yearSel').addEventListener('change', e => {
+  const y = +e.target.value; let m = S.sel.m;
+  if (!S.byKey.has(keyOf(y, m))){ const ms = yearMonths(y).filter(Boolean); m = ms[ms.length - 1].m; hint(`${MONTHS[S.sel.m]} ${y} has no data — showing ${labelOf(y, m)}.`, 'err'); }
+  else hint('');
+  select(y, m, { keepHint: true });
+});
+$('monthSel').addEventListener('change', e => { hint(''); select(S.sel.y, +e.target.value); });
+$('picker').addEventListener('change', e => {
+  const v = e.target.value; if (!v) return;
+  const [y, m] = v.split('-').map(Number);
+  if (!select(y, m - 1)){ hint(`No data for ${labelOf(y, m - 1)}. Available: ${range()}.`, 'err'); e.target.value = S.sel.key; } else hint('');
+});
+function trySearch(strict){
+  const v = $('searchBox').value; if (!v.trim()){ hint(''); renderFilters(); return; }
+  const p = parseMonthQuery(v);
+  if (p && S.byKey.has(keyOf(p.y, p.m))){ hint(`Found ${labelOf(p.y, p.m)}`, 'ok'); select(p.y, p.m, { keepSearch: !strict }); if (strict) $('searchBox').blur(); return; }
+  if (strict){
+    if (!p) hint(`“${v}” was not recognised. Try August 2025, Aug 2025, 08/2025 or 2025-08.`, 'err');
+    else hint(`No data for ${labelOf(p.y, p.m)}. Available: ${range()}.`, 'err');
+  }
+}
+$('searchBox').addEventListener('input', () => trySearch(false));
+$('searchBox').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); trySearch(true); } });
+$('resetBtn').addEventListener('click', () => {
+  const l = latest(); $('searchBox').value = ''; hint('');
+  S.tbl = { q: '', year: 'all', sort: 'key', dir: -1 }; const ts = $('tblSearch'); if (ts) ts.value = '';
+  S.sel = { y: l.y, m: l.m, key: l.key }; S.cmp = null; render();
+});
+$('refreshBtn').addEventListener('click', () => { S.source = S.source && S.source.kind === 'file' ? null : S.source; load(); });
+$('csvFile').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try { ingest(String(rd.result), { kind: 'file', name: f.name, at: new Date() }); clearInterval(S.timer);
+      setStatus('file', 'Local CSV loaded', `Last Updated: ${fmtTime(S.source.at)} · ${esc(f.name)}`); render(); }
+    catch (err){ hint(`${f.name}: ${err.message}`, 'err'); }
+    e.target.value = '';
+  };
+  rd.readAsText(f);
+});
+// Theme changes: rebuild charts so they pick up the new token colors
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rebuildChartsForTheme); } catch (_){}
+new MutationObserver(rebuildChartsForTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// Pick up new sheet rows when the viewer comes back to the tab (at most once a minute)
+let lastFocusLoad = Date.now();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && Date.now() - lastFocusLoad > 60000 && S.source && S.source.kind === 'live'){ lastFocusLoad = Date.now(); load(); }
+});
+
+load();
+})();
+</script>
+</body>
+</html>
