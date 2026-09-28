@@ -205,6 +205,33 @@ code{background:var(--surface-2);border:1px solid var(--border);padding:1px 6px;
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* Responsive */
+/* Budget */
+.bud-head{padding:18px 20px;display:flex;flex-wrap:wrap;gap:10px 24px;align-items:baseline;justify-content:space-between}
+.bud-head p{margin:0;font-size:15px;color:var(--ink-2);max-width:70ch}
+.bud-head p b{color:var(--ink)}
+.fy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.fy-card{padding:18px 20px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.fy-card.latest{background:var(--brand-soft);border-color:var(--brand-line)}
+.fy-card .top-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fy-card .fy{font-size:13px;font-weight:800;letter-spacing:.06em}
+.fy-card .per{font-size:12px;color:var(--muted)}
+.fy-card .val{font-size:clamp(24px,2.6vw,30px);font-weight:800;letter-spacing:-.01em;line-height:1.15}
+.fy-card .chg{font-size:13px;color:var(--ink-2)}
+.fy-card .chg b{font-size:18px;color:var(--ink)}
+.fy-card .chg small{display:block;font-size:12px;color:var(--muted)}
+.jump-list{margin:0;padding:0;list-style:none}
+.jump-list li{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:baseline;padding:10px 20px;border-top:1px solid var(--border)}
+.jump-list li:first-child{border-top:0}
+.jump-list .rk{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.jump-list .what{min-width:0}
+.jump-list .what b{display:block}
+.jump-list .what span{font-size:12px;color:var(--muted)}
+.jump-list .pc{font-weight:800;font-size:16px}
+.chip.jump{background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
+.bud-2col{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
+.fy-row td:first-child{font-weight:700}
+.fy-start td{border-top:2px solid var(--border-strong)}
+@media (max-width:1100px){.bud-2col{grid-template-columns:1fr}}
 @media (max-width:1100px){
   .charts{grid-template-columns:1fr}
   .fgrid{grid-template-columns:120px 150px minmax(180px,1fr) 160px auto}
@@ -389,6 +416,11 @@ code{background:var(--surface-2);border:1px solid var(--border);padding:1px 6px;
     </div>
   </section>
 
+  <section aria-labelledby="budH">
+    <div class="sec-h"><h2 id="budH">Budget growth · financial year (Apr–Mar)</h2><span class="note" id="budNote">From Sheet2 · Year, Month, Amount</span></div>
+    <div id="budgetBody" style="display:flex;flex-direction:column;gap:14px"><div class="card empty"><b>Loading budget data…</b>Reading Sheet2.</div></div>
+  </section>
+
   <section aria-labelledby="dqH">
     <h2 id="dqH" class="sr">Data quality and source</h2>
     <details class="card dq" id="dq">
@@ -411,10 +443,16 @@ code{background:var(--surface-2);border:1px solid var(--border);padding:1px 6px;
    A "File > Share > Publish to web > CSV" link also works here.
    ===================================================================== */
 const CONFIG = {
-  SHEET_CSV_URL: 'https://docs.google.com/spreadsheets/d/1atmIq7RGEySBZ1DhlbaYDksS3UQbxCp1DxWTHjjLIOU/gviz/tq?tqx=out:csv&gid=0',
+  SHEET_CSV_URL: 'https://docs.google.com/spreadsheets/d/1atmIq7RGEySBZ1DhlbaYDksS3UQbxCp1DxWTHjjLIOU/gviz/tq?tqx=out:csv&headers=1&gid=0',
   SHEET_EDIT_URL: 'https://docs.google.com/spreadsheets/d/1atmIq7RGEySBZ1DhlbaYDksS3UQbxCp1DxWTHjjLIOU/edit',
   FETCH_TIMEOUT_MS: 8000,
-  AUTO_REFRESH_MINUTES: 15   // re-pull the sheet while the page is open; 0 disables
+  AUTO_REFRESH_MINUTES: 15,  // re-pull the sheet while the page is open; 0 disables
+
+  // Budget section: reads the tab named "Sheet2" (columns Year, Month, Amount).
+  // If you rename that tab, change sheet=Sheet2 below to the new tab name.
+  BUDGET_CSV_URL: 'https://docs.google.com/spreadsheets/d/1atmIq7RGEySBZ1DhlbaYDksS3UQbxCp1DxWTHjjLIOU/gviz/tq?tqx=out:csv&headers=1&sheet=Sheet2',
+  BUDGET_CURRENCY: '₹',      // symbol shown before budget amounts; '' for none
+  BUDGET_JUMP_PCT: 15        // a month is flagged as a jump when it is at least this % above the previous month
 };
 
 /* Offline fallback: an exact, unmodified copy of the sheet's CSV export, taken at
@@ -485,6 +523,46 @@ const SNAPSHOT = {
 7/1/2026,1272,1243
 8/1/2026,1202,889`
 };
+const BUDGET_SNAPSHOT = {
+  takenAt: '2026-09-28T11:55:00Z',
+  csv: `Year,Month,Amount
+2023,April,932744.52
+2023,May,750993.7
+2023,June,725466.6
+2023,July,761527.82
+2023,August,759798.25
+2023,September,707068.54
+2023,October,764414.9
+2023,November,740025.91
+2023,December,777745.02
+2024,January,818343.12
+2024,February,835133.74
+2024,March,920537.83
+2024,April,923049.04
+2024,May,955647.23
+2024,June,942470.51
+2024,July,913341.67
+2024,August,717795.9
+2024,September,722650.83
+2024,October,754465.21
+2024,November,707863.92
+2024,December,984406.85
+2025,January,1126922.56
+2025,February,1063571.05
+2025,March,961058.04
+2025,April,972588.35
+2025,May,951468.34
+2025,June,915145.78
+2025,July,1083674.59
+2025,August,1162176.59
+2025,September,1236096.85
+2025,October,1275975.3
+2025,November,1236092.22
+2025,December,1163206.86
+2026,January,1210539.11
+2026,February,1171929.37
+2026,March,1204033.21`
+};
 
 (function(){
 'use strict';
@@ -538,7 +616,7 @@ function parseDateCell(v){
   return null;
 }
 function parseNumCell(v){
-  const s = String(v == null ? '' : v).trim().replace(/[,\s]/g, '');
+  const s = String(v == null ? '' : v).trim().replace(/[,\s₹$]/g, '');
   if (s === '' || s === '-') return { missing: true, n: 0 };
   if (!/^-?\d+(\.\d+)?$/.test(s)) return { bad: true };
   return { n: +s };
@@ -645,35 +723,43 @@ function setStatus(kind, text, meta){
 const fmtTime = d => d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 /* ---------- load ---------- */
-async function fetchSheet(){
+/* gviz table → rows. Number cells use the sheet's exact stored value (cell.v), so totals
+   match =SUM() in Google Sheets even when the sheet displays rounded numbers. */
+function gvizToRows(resp){
+  if (!resp || resp.status === 'error' || !resp.table) throw new Error('sheet returned an error');
+  const cols = resp.table.cols || [];
+  return [cols.map(c => c.label || '')].concat((resp.table.rows || []).map(r => (r.c || []).map((cell, i) => {
+    if (!cell) return '';
+    return cols[i] && cols[i].type === 'number' ? (cell.v == null ? '' : String(cell.v)) : (cell.f != null ? cell.f : (cell.v == null ? '' : String(cell.v)));
+  })));
+}
+const isGviz = url => /\/gviz\/tq\?/.test(url) && /tqx=out:csv/.test(url);
+/* Main route: fetch over CORS (works on GitHub Pages and any web host). For gviz URLs it
+   requests the JSON form to get exact values; any other URL (e.g. a published CSV) is read as CSV. */
+async function fetchSheet(url = CONFIG.SHEET_CSV_URL){
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), CONFIG.FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(CONFIG.SHEET_CSV_URL, { cache: 'no-store', signal: ctl.signal });
+    const u = isGviz(url) ? url.replace(/tqx=out:csv/, 'tqx=out:json') : url;
+    const res = await fetch(u, { cache: 'no-store', signal: ctl.signal });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    return await res.text();
+    const text = await res.text();
+    if (!isGviz(url)) return text;
+    const a = text.indexOf('{'), b = text.lastIndexOf('}');
+    if (a < 0 || b < a) throw new Error('unexpected response from Google Sheets');
+    return gvizToRows(JSON.parse(text.slice(a, b + 1)));
   } finally { clearTimeout(t); }
 }
 /* Second route to the same sheet: the gviz JSONP response. It needs no CORS, so it also
-   works when the file is opened straight from disk (file://). Derived from SHEET_CSV_URL. */
-function fetchSheetJsonp(){
+   works when the file is opened straight from disk (file://). */
+function fetchSheetJsonp(url = CONFIG.SHEET_CSV_URL){
   return new Promise((resolve, reject) => {
-    const cb = '__stownestSheet' + Date.now(), s = document.createElement('script');
+    if (!isGviz(url)) return reject(new Error('live request failed'));
+    const cb = '__stownestSheet' + Date.now() + Math.floor(Math.random() * 1e6), s = document.createElement('script');
     const t = setTimeout(() => { done(); reject(new Error('request timed out')); }, CONFIG.FETCH_TIMEOUT_MS);
     function done(){ clearTimeout(t); try { delete window[cb]; } catch (_){} s.remove(); }
-    window[cb] = resp => {
-      done();
-      if (!resp || resp.status === 'error' || !resp.table) return reject(new Error('sheet returned an error'));
-      const cols = resp.table.cols || [];
-      const rows = [cols.map(c => c.label || '')].concat((resp.table.rows || []).map(r => (r.c || []).map((cell, i) => {
-        if (!cell) return '';
-        return cols[i] && cols[i].type === 'number' ? (cell.v == null ? '' : String(cell.v)) : (cell.f != null ? cell.f : (cell.v == null ? '' : String(cell.v)));
-      })));
-      resolve(rows);
-    };
+    window[cb] = resp => { done(); try { resolve(gvizToRows(resp)); } catch (e){ reject(e); } };
     s.onerror = () => { done(); reject(new Error('request blocked')); };
-    const u = CONFIG.SHEET_CSV_URL.replace(/tqx=out:csv/, 'tqx=out:json;responseHandler:' + cb);
-    s.src = u + (u === CONFIG.SHEET_CSV_URL ? '' : '&_=' + Date.now());
-    if (u === CONFIG.SHEET_CSV_URL) { done(); return reject(new Error('JSONP route needs a gviz URL')); }
+    s.src = url.replace(/tqx=out:csv/, 'tqx=out:json;responseHandler:' + cb) + '&_=' + Date.now();
     document.head.appendChild(s);
   });
 }
@@ -700,6 +786,7 @@ async function load(){
   } finally { $('refreshBtn').disabled = false; }
   render();
   scheduleRefresh();
+  loadBudget();
 }
 function scheduleRefresh(){
   clearInterval(S.timer);
@@ -934,7 +1021,227 @@ function renderCharts(){
   if (S.charts.bar) S.charts.bar.destroy();
   S.charts.bar = new Chart($('barChart'), barCfg);
 }
-function rebuildChartsForTheme(){ Object.values(S.charts).forEach(c => c && c.destroy()); S.charts = {}; if (S.built) renderCharts(); }
+function rebuildChartsForTheme(){ Object.values(S.charts).forEach(c => c && c.destroy()); S.charts = {}; if (S.built){ renderCharts(); renderBudget(); } }
+
+
+/* =====================================================================
+   BUDGET (Sheet2): Year, Month, Amount — analysed by financial year Apr–Mar
+   ===================================================================== */
+const FY_MON = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+const Bd = { records: null, byKey: new Map(), fys: [], fyMap: new Map(), issues: [], dupes: [], source: null, error: null, fyFilter: 'all' };
+const fyStartOf = (y, m) => m >= 3 ? y : y - 1;
+const fyLabel = s => `FY ${s}-${String((s + 1) % 100).padStart(2, '0')}`;
+const fyIdxOf = m => (m + 9) % 12; // Apr → 0 … Mar → 11
+const fmtC = n => (n == null || !isFinite(n)) ? '—' : (n < 0 ? '−' : '') + CONFIG.BUDGET_CURRENCY + Math.abs(Math.round(n)).toLocaleString('en-US');
+const sgnC = n => (n == null || !isFinite(n)) ? '—' : (n > 0 ? '+' : n < 0 ? '−' : '') + CONFIG.BUDGET_CURRENCY + Math.abs(Math.round(n)).toLocaleString('en-US');
+const monLabel = r => `${MON[r.m]} ${r.y}`;
+const isDark = () => document.documentElement.matches('[data-theme="dark"]') || (matchMedia('(prefers-color-scheme: dark)').matches && !document.documentElement.matches('[data-theme="light"]'));
+
+function ingestBudget(input, source){
+  const rows = (typeof input === 'string' ? parseCSV(input) : input).filter(r => r.some(c => String(c).trim() !== ''));
+  if (!rows.length) throw new Error('Sheet2 returned no rows.');
+  const head = rows[0].map(h => String(h).trim().toLowerCase());
+  let iY = head.findIndex(h => h.includes('year')), iM = head.findIndex(h => h.startsWith('month')), iA = head.findIndex(h => /amount|budget|spend|value/.test(h));
+  let start = 1;
+  if (iY < 0 || iM < 0 || iA < 0){ iY = 0; iM = 1; iA = 2; if (/^\d{4}$/.test(String(rows[0][0]).trim())) start = 0; }
+  const issues = [], groups = new Map();
+  for (let r = start; r < rows.length; r++){
+    const row = rows[r], sheetRow = r + 1;
+    const yRaw = String(row[iY] || '').trim(), mRaw = String(row[iM] || '').trim();
+    const y = /^\d{4}$/.test(yRaw) ? +yRaw : NaN;
+    let m = monthIdx(mRaw); if (m < 0 && /^\d{1,2}$/.test(mRaw) && +mRaw >= 1 && +mRaw <= 12) m = +mRaw - 1;
+    if (!isFinite(y) || m < 0){ issues.push({ level: 'error', msg: `Sheet2 row ${sheetRow}: year "${yRaw || '(blank)'}" / month "${mRaw || '(blank)'}" not recognised — row not included.` }); continue; }
+    const a = parseNumCell(row[iA]);
+    if (a.bad){ issues.push({ level: 'error', msg: `Sheet2 row ${sheetRow} (${MONTHS[m]} ${y}): amount "${row[iA]}" is not a number — row not included.` }); continue; }
+    if (a.missing){ issues.push({ level: 'info', msg: `Sheet2 row ${sheetRow} (${MONTHS[m]} ${y}): no amount entered yet — month not shown until a value is added.` }); continue; }
+    const k = keyOf(y, m);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push({ sheetRow, y, m, amount: a.n });
+  }
+  const records = [], dupes = [];
+  for (const [k, list] of groups){
+    const f = list[0], amount = list.reduce((t, x) => t + x.amount, 0);
+    if (list.length > 1) dupes.push({ label: MONTHS[f.m] + ' ' + f.y, rows: list.map(x => x.sheetRow), identical: list.every(x => x.amount === f.amount) });
+    records.push({ key: k, y: f.y, m: f.m, amount, fy: fyStartOf(f.y, f.m), fi: fyIdxOf(f.m), sheetRows: list.map(x => x.sheetRow), dup: list.length > 1 });
+  }
+  if (!records.length) throw new Error('No budget rows with a year, month and amount were found in Sheet2.');
+  records.sort((a, b) => a.key < b.key ? -1 : 1);
+  const byKey = new Map(records.map(r => [r.key, r]));
+  for (const r of records){
+    const pm = r.m === 0 ? byKey.get(keyOf(r.y - 1, 11)) : byKey.get(keyOf(r.y, r.m - 1));
+    r.prev = pm || null; r.mom = pm ? r.amount - pm.amount : null; r.momPct = pm && pm.amount ? r.mom / pm.amount * 100 : null;
+    const ly = byKey.get(keyOf(r.y - 1, r.m));
+    r.ly = ly || null; r.yoy = ly ? r.amount - ly.amount : null; r.yoyPct = ly && ly.amount ? r.yoy / ly.amount * 100 : null;
+    r.jump = r.momPct != null && r.momPct >= CONFIG.BUDGET_JUMP_PCT;
+  }
+  const fyMap = new Map();
+  for (const r of records){
+    if (!fyMap.has(r.fy)) fyMap.set(r.fy, { s: r.fy, recs: [] });
+    fyMap.get(r.fy).recs.push(r);
+  }
+  const fys = [...fyMap.keys()].sort((a, b) => a - b);
+  for (const s of fys){
+    const F = fyMap.get(s), recs = F.recs;
+    F.months = recs.length; F.total = recs.reduce((t, r) => t + r.amount, 0); F.avg = F.total / F.months;
+    F.max = recs.reduce((a, b) => b.amount > a.amount ? b : a); F.min = recs.reduce((a, b) => b.amount < a.amount ? b : a);
+    F.first = recs[0]; F.last = recs[recs.length - 1]; F.cmp = null;
+    if (fyMap.has(s - 1)){
+      // like-for-like: only months present in both financial years
+      const both = recs.filter(r => r.ly);
+      const cur = both.reduce((t, r) => t + r.amount, 0), prev = both.reduce((t, r) => t + r.ly.amount, 0);
+      if (both.length) F.cmp = { n: both.length, full: both.length === 12, cur, prev, chg: cur - prev, pct: prev ? (cur - prev) / prev * 100 : null, vs: fyLabel(s - 1) };
+    }
+  }
+  Object.assign(Bd, { records, byKey, fys, fyMap, issues, dupes, source, error: null });
+  if (Bd.fyFilter !== 'all' && !fyMap.has(+Bd.fyFilter)) Bd.fyFilter = 'all';
+}
+
+async function loadBudget(){
+  if (!CONFIG.BUDGET_CSV_URL) return;
+  try {
+    let data;
+    try { data = await fetchSheet(CONFIG.BUDGET_CSV_URL); } catch (e1){ data = await fetchSheetJsonp(CONFIG.BUDGET_CSV_URL); }
+    ingestBudget(data, { kind: 'live', at: new Date() });
+  } catch (e){
+    const msg = e && e.name === 'AbortError' ? 'request timed out' : (e && e.message) || 'request blocked';
+    if (!Bd.records || Bd.source.kind === 'snapshot'){
+      try { ingestBudget(BUDGET_SNAPSHOT.csv, { kind: 'snapshot', at: new Date(BUDGET_SNAPSHOT.takenAt), error: msg }); }
+      catch (e2){ Bd.error = e2.message; }
+    }
+  }
+  renderBudget();
+}
+
+function renderBudget(){
+  const box = $('budgetBody'); if (!box) return;
+  ['budLine', 'budFy'].forEach(k => { if (S.charts[k]){ S.charts[k].destroy(); delete S.charts[k]; } });
+  if (!Bd.records){
+    box.innerHTML = `<div class="card empty"><b>${Bd.error ? 'Budget data could not be read.' : 'Loading budget data…'}</b>${Bd.error ? esc(Bd.error) + '<br>Check that Sheet2 exists with columns Year, Month, Amount and that the sheet is shared as “Anyone with the link can view”.' : 'Reading Sheet2.'}</div>`;
+    return;
+  }
+  const recs = Bd.records, fys = Bd.fys, F = s => Bd.fyMap.get(s), src = Bd.source;
+  $('budNote').textContent = src.kind === 'live' ? `Sheet2 · live · updated ${fmtTime(src.at)}` : `Sheet2 · snapshot from ${fmtTime(src.at)}`;
+  const out = [];
+
+  if (Bd.dupes.length) out.push(`<div class="banner" role="alert"><span>⚠</span><div><b>Duplicate budget months in Sheet2.</b> ${Bd.dupes.map(d => `${esc(d.label)} (rows ${d.rows.join(', ')}${d.identical ? ', identical values' : ''})`).join('; ')}. Their amounts are summed below. If they are repeated entries, correct Sheet2 and refresh.</div></div>`);
+  const bErr = Bd.issues.filter(i => i.level === 'error');
+  if (bErr.length) out.push(`<div class="banner" role="alert"><span>⚠</span><div><b>${bErr.length} Sheet2 row${bErr.length > 1 ? 's' : ''} could not be read:</b> ${bErr.map(i => esc(i.msg)).join(' ')}</div></div>`);
+  if (src.kind === 'snapshot') out.push(`<div class="banner"><span>ℹ</span><div><b>Showing a snapshot of Sheet2</b> taken ${fmtTime(src.at)}. The live request did not succeed here (${esc(src.error || 'blocked')}).</div></div>`);
+
+  const full = fys.filter(s => F(s).months === 12);
+  let headline;
+  if (full.length >= 2){
+    const a = F(full[0]), b = F(full[full.length - 1]), pc = (b.total - a.total) / a.total * 100;
+    headline = `Total budget went from <b>${fmtC(a.total)}</b> in ${fyLabel(a.s)} to <b>${fmtC(b.total)}</b> in ${fyLabel(b.s)}, a change of <b>${sgnP(pc)}</b> (${sgnC(b.total - a.total)}).`;
+  } else headline = `${recs.length} months of budget data.`;
+  out.push(`<div class="card bud-head"><p>${headline}</p><span class="chip num">${recs.length} months · ${monLabel(recs[0])} – ${monLabel(recs[recs.length - 1])}</span></div>`);
+
+  out.push(`<div class="fy-grid">${fys.map((s, i) => {
+    const X = F(s), latest = i === fys.length - 1;
+    const chg = X.cmp
+      ? `<div class="chg"><b class="num">${sgnP(X.cmp.pct)}</b> <span class="num">${sgnC(X.cmp.chg)}</span><small>${X.cmp.full ? `vs ${X.cmp.vs} total (${fmtC(X.cmp.prev)})` : `vs same ${X.cmp.n} month${X.cmp.n > 1 ? 's' : ''} of ${X.cmp.vs} (${fmtC(X.cmp.prev)})`}</small></div>`
+      : `<div class="chg"><small>First financial year in Sheet2, so there is no earlier year to compare</small></div>`;
+    return `<article class="card fy-card${latest ? ' latest' : ''}">
+      <div class="top-row"><span class="fy">${fyLabel(s)}</span>${X.months < 12 ? `<span class="chip warn">${X.months} of 12 months</span>` : `<span class="chip">12 months</span>`}</div>
+      <div class="per">Apr ${s} – Mar ${s + 1}${X.months < 12 ? ` · data ${MON[X.first.m]}–${MON[X.last.m]}` : ''}</div>
+      <div class="val num">${fmtC(X.total)}</div>${chg}
+      <div class="per num">Avg ${fmtC(X.avg)} / month · Highest ${MON[X.max.m]} ${fmtC(X.max.amount)}</div>
+    </article>`; }).join('')}</div>`);
+
+  const top = recs.filter(r => r.momPct != null && r.mom > 0).sort((a, b) => b.momPct - a.momPct).slice(0, 6);
+  out.push(`<div class="bud-2col">
+    <article class="card chart-card">
+      <div class="chart-head"><div><h3>Monthly budget</h3><p class="cap">Dashed lines mark the start of each financial year · hover for month-on-month and year-on-year change</p></div>
+        <div class="legend"><span><i class="line" style="background:var(--brand)"></i>Budget</span><span><i style="background:var(--warn);border-radius:50%"></i>≥${CONFIG.BUDGET_JUMP_PCT}% above previous month</span></div></div>
+      <div class="chart-box"><canvas id="budLine" aria-label="Monthly budget line chart"></canvas></div>
+    </article>
+    <article class="card">
+      <div style="padding:18px 20px 10px"><h3 style="margin:0;font-size:15px;font-weight:700">Biggest month-on-month increases</h3><p class="cap" style="margin:2px 0 0;font-size:12px;color:var(--muted)">Where the budget rose most sharply vs the previous month</p></div>
+      <ul class="jump-list">${top.length ? top.map((r, i) => `<li><span class="rk">${i + 1}</span><span class="what"><b>${MONTHS[r.m]} ${r.y}</b><span class="num">${fmtC(r.prev.amount)} → ${fmtC(r.amount)} (${sgnC(r.mom)}) · ${fyLabel(r.fy)}</span></span><span class="pc num">${sgnP(r.momPct)}</span></li>`).join('') : '<li><span></span><span class="what">No month-on-month increases in the data.</span><span></span></li>'}</ul>
+    </article>
+  </div>`);
+
+  const shownFys = fys.slice(-3);
+  out.push(`<article class="card chart-card">
+    <div class="chart-head"><div><h3>Financial years side by side</h3><p class="cap">Monthly budget, April to March${fys.length > 3 ? ' · latest 3 financial years' : ''}</p></div>
+      <div class="legend" id="budFyLegend"></div></div>
+    <div class="chart-box"><canvas id="budFy" aria-label="Budget by financial year chart"></canvas></div>
+  </article>`);
+
+  out.push(`<div class="card"><div class="sec-h" style="padding:16px 20px 0;margin:0"><h2 style="font-size:12px">Financial year summary</h2><span class="note">% change compares only months present in both years</span></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Financial year</th><th>Months</th><th>Total budget</th><th>Change vs previous FY</th><th>% change</th><th>Avg / month</th><th>Highest month</th><th>Lowest month</th></tr></thead>
+      <tbody>${fys.map(s => { const X = F(s); return `<tr class="fy-row"><td>${fyLabel(s)}</td><td>${X.months}/12</td><td>${fmtC(X.total)}</td><td>${X.cmp ? sgnC(X.cmp.chg) + (X.cmp.full ? '' : ` <span class="chip">${X.cmp.n} mo</span>`) : '—'}</td><td>${X.cmp ? sgnP(X.cmp.pct) : '—'}</td><td>${fmtC(X.avg)}</td><td>${MON[X.max.m]} ${X.max.y} · ${fmtC(X.max.amount)}</td><td>${MON[X.min.m]} ${X.min.y} · ${fmtC(X.min.amount)}</td></tr>`; }).join('')}</tbody>
+    </table></div></div>`);
+
+  const filt = Bd.fyFilter === 'all' ? recs : recs.filter(r => String(r.fy) === Bd.fyFilter);
+  out.push(`<div class="card">
+    <div class="tbl-tools"><strong style="font-size:14px">Month-wise budget change</strong>
+      <label for="budFyFilter" class="sr">Financial year</label>
+      <select id="budFyFilter" class="ctl" style="width:auto;margin-left:auto"><option value="all">All financial years</option>${fys.slice().reverse().map(s => `<option value="${s}"${String(s) === Bd.fyFilter ? ' selected' : ''}>${fyLabel(s)}</option>`).join('')}</select></div>
+    <div class="tbl-scroll"><table>
+      <thead><tr><th>Month</th><th>Financial year</th><th>Budget</th><th>vs previous month</th><th>MoM %</th><th>Same month last year</th><th>vs last year</th><th>YoY %</th></tr></thead>
+      <tbody>${filt.map((r, i) => `<tr class="${i && r.fi === 0 ? 'fy-start' : ''}"><td>${MONTHS[r.m]} ${r.y}${r.jump ? ' <span class="chip jump">jump</span>' : ''}${r.dup ? ' <span class="chip warn">dup</span>' : ''}</td><td>${fyLabel(r.fy)}</td><td>${fmtC(r.amount)}</td><td>${sgnC(r.mom)}</td><td>${sgnP(r.momPct)}</td><td>${r.ly ? fmtC(r.ly.amount) : '—'}</td><td>${sgnC(r.yoy)}</td><td>${sgnP(r.yoyPct)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>${Bd.fyFilter === 'all' ? 'All months' : fyLabel(+Bd.fyFilter)}</td><td></td><td>${fmtC(filt.reduce((t, r) => t + r.amount, 0))}</td><td colspan="5" style="text-align:left;font-weight:500;color:var(--muted)">“jump” = at least ${CONFIG.BUDGET_JUMP_PCT}% above the previous month</td></tr></tfoot>
+    </table></div></div>`);
+
+  box.innerHTML = out.join('');
+  $('budFyFilter').addEventListener('change', e => { Bd.fyFilter = e.target.value; renderBudget(); });
+  drawBudgetCharts(shownFys);
+}
+
+function drawBudgetCharts(shownFys){
+  if (!window.Chart){ document.querySelectorAll('#budgetBody .chart-box').forEach(b => b.innerHTML = '<div class="empty">Charts could not load. All figures remain in the tables.</div>'); return; }
+  applyChartDefaults();
+  const recs = Bd.records, tt = tooltipStyle();
+  const brand = tok('--brand'), warn = tok('--warn'), surf = tok('--surface'), grid = tok('--grid'), ink2 = tok('--ink-2'), muted = tok('--muted'), strong = tok('--border-strong');
+  const yScale = { beginAtZero: false, grid: { color: grid, drawTicks: false }, border: { display: false }, ticks: { padding: 8, callback: v => CONFIG.BUDGET_CURRENCY + Number(v).toLocaleString('en-US') } };
+  const fyLines = {
+    id: 'fyLines',
+    afterDatasetsDraw(c){
+      const { ctx, chartArea: a, scales: { x } } = c;
+      ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = strong; ctx.lineWidth = 1; ctx.fillStyle = muted; ctx.font = '600 11px ' + (tok('--font') || 'sans-serif');
+      recs.forEach((r, i) => { if (r.fi !== 0) return; const px = x.getPixelForValue(i); ctx.beginPath(); ctx.moveTo(px, a.top); ctx.lineTo(px, a.bottom); ctx.stroke(); ctx.fillText(fyLabel(r.fy), px + 4, a.top + 10); });
+      ctx.restore();
+    }
+  };
+  S.charts.budLine = new Chart($('budLine'), {
+    type: 'line',
+    data: { labels: recs.map(r => `${MON[r.m]} '${String(r.y).slice(2)}`), datasets: [{ label: 'Budget', data: recs.map(r => r.amount), borderColor: brand, borderWidth: 2, tension: .2, fill: true, backgroundColor: tok('--brand-soft'),
+      pointRadius: recs.map(r => r.jump ? 5 : 2), pointBackgroundColor: recs.map(r => r.jump ? warn : brand), pointBorderColor: surf, pointBorderWidth: recs.map(r => r.jump ? 2 : 0), pointHoverRadius: 6 }] },
+    options: { maintainAspectRatio: false, animation: { duration: 250 }, interaction: { mode: 'index', intersect: false },
+      layout: { padding: { top: 14 } },
+      scales: { y: yScale, x: { grid: { display: false }, border: { color: strong }, ticks: { color: ink2, maxRotation: 0, autoSkip: true, autoSkipPadding: 10 } } },
+      plugins: { legend: { display: false }, tooltip: { ...tt, displayColors: false, callbacks: {
+        title: it => { const r = recs[it[0].dataIndex]; return `${MONTHS[r.m]} ${r.y} · ${fyLabel(r.fy)}`; },
+        label: c => `Budget: ${fmtC(c.raw)}`,
+        afterLabel: c => { const r = recs[c.dataIndex];
+          return [r.prev ? `vs ${monLabel(r.prev)}: ${sgnC(r.mom)} (${sgnP(r.momPct)})` : 'No previous month in data',
+                  r.ly ? `vs ${monLabel(r.ly)}: ${sgnC(r.yoy)} (${sgnP(r.yoyPct)})` : 'No same month last year']; }
+      } } } },
+    plugins: [fyLines]
+  });
+
+  // FY overlay: newest FY = green (thick solid), previous = amber (solid), older = blue (dashed)
+  const amber = isDark() ? '#D99A45' : '#C9822B';
+  const styles = [{ c: tok('--c-invalid'), dash: [6, 4], w: 2 }, { c: amber, dash: [], w: 2 }, { c: tok('--c-valid'), dash: [], w: 3 }].slice(3 - shownFys.length);
+  const ds = shownFys.map((s, i) => {
+    const X = Bd.fyMap.get(s), arr = Array(12).fill(null); X.recs.forEach(r => { arr[r.fi] = r.amount; });
+    const st = styles[i];
+    return { label: fyLabel(s), fy: s, data: arr, borderColor: st.c, backgroundColor: st.c, pointBackgroundColor: st.c, pointBorderColor: surf, pointBorderWidth: 2, borderDash: st.dash, borderWidth: st.w, pointRadius: 3, pointHoverRadius: 6, tension: .2, spanGaps: false };
+  });
+  $('budFyLegend').innerHTML = ds.map(d => `<span><i class="line" style="background:${d.borderDash.length ? `repeating-linear-gradient(90deg,${d.borderColor} 0 5px,transparent 5px 8px)` : d.borderColor}"></i>${d.label} · ${fmtC(Bd.fyMap.get(d.fy).total)}</span>`).join('');
+  S.charts.budFy = new Chart($('budFy'), {
+    type: 'line', data: { labels: FY_MON, datasets: ds },
+    options: { maintainAspectRatio: false, animation: { duration: 250 }, interaction: { mode: 'index', intersect: false },
+      scales: { y: yScale, x: { grid: { display: false }, border: { color: strong }, ticks: { color: ink2 } } },
+      plugins: { legend: { display: false }, tooltip: { ...tt, callbacks: {
+        title: it => FY_MON[it[0].dataIndex],
+        label: c => { if (c.raw == null) return ` ${c.dataset.label}: no data`; const s = c.dataset.fy, r = Bd.byKey.get(keyOf(c.dataIndex < 9 ? s : s + 1, (c.dataIndex + 3) % 12));
+          return ` ${c.dataset.label}: ${fmtC(c.raw)}${r && r.ly ? `  (${sgnP(r.yoyPct)} vs previous FY)` : ''}`; }
+      } } } }
+  });
+}
 
 /* ---------- events ---------- */
 function wireDash(){
