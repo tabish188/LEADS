@@ -206,32 +206,16 @@ code{background:var(--surface-2);border:1px solid var(--border);padding:1px 6px;
 
 /* Responsive */
 /* Budget */
-.bud-head{padding:18px 20px;display:flex;flex-wrap:wrap;gap:10px 24px;align-items:baseline;justify-content:space-between}
-.bud-head p{margin:0;font-size:15px;color:var(--ink-2);max-width:70ch}
-.bud-head p b{color:var(--ink)}
-.fy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
-.fy-card{padding:18px 20px;display:flex;flex-direction:column;gap:6px;min-width:0}
-.fy-card.latest{background:var(--brand-soft);border-color:var(--brand-line)}
-.fy-card .top-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.fy-card .fy{font-size:13px;font-weight:800;letter-spacing:.06em}
-.fy-card .per{font-size:12px;color:var(--muted)}
-.fy-card .val{font-size:clamp(24px,2.6vw,30px);font-weight:800;letter-spacing:-.01em;line-height:1.15}
-.fy-card .chg{font-size:13px;color:var(--ink-2)}
-.fy-card .chg b{font-size:18px;color:var(--ink)}
-.fy-card .chg small{display:block;font-size:12px;color:var(--muted)}
-.jump-list{margin:0;padding:0;list-style:none}
-.jump-list li{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:baseline;padding:10px 20px;border-top:1px solid var(--border)}
-.jump-list li:first-child{border-top:0}
-.jump-list .rk{font-family:var(--mono);font-size:12px;color:var(--muted)}
-.jump-list .what{min-width:0}
-.jump-list .what b{display:block}
-.jump-list .what span{font-size:12px;color:var(--muted)}
-.jump-list .pc{font-weight:800;font-size:16px}
-.chip.jump{background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
-.bud-2col{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
-.fy-row td:first-child{font-weight:700}
-.fy-start td{border-top:2px solid var(--border-strong)}
-@media (max-width:1100px){.bud-2col{grid-template-columns:1fr}}
+#budgetBody .tbl-tools{align-items:flex-end}
+.bud-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));border-top:1px solid var(--border)}
+.bud-sum>div{padding:16px 20px;border-left:1px solid var(--border)}
+.bud-sum>div:first-child{border-left:0}
+.bud-sum p{margin:0;padding:16px 20px;color:var(--muted)}
+.bud-sum .lbl{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.bud-sum .big{font-size:clamp(22px,2.6vw,28px);font-weight:800;margin-top:2px}
+.bud-sum .sub{font-size:12px;color:var(--muted)}
+td.pos{color:var(--brand-ink);font-weight:700}
+td.neg{color:var(--c-invalid);font-weight:700}
 @media (max-width:1100px){
   .charts{grid-template-columns:1fr}
   .fgrid{grid-template-columns:120px 150px minmax(180px,1fr) 160px auto}
@@ -417,7 +401,7 @@ code{background:var(--surface-2);border:1px solid var(--border);padding:1px 6px;
   </section>
 
   <section aria-labelledby="budH">
-    <div class="sec-h"><h2 id="budH">Budget growth · financial year (Apr–Mar)</h2><span class="note" id="budNote">From Sheet2 · Year, Month, Amount</span></div>
+    <div class="sec-h"><h2 id="budH">Budget · month-wise change</h2><span class="note" id="budNote">From Sheet2 · Year, Month, Amount</span></div>
     <div id="budgetBody" style="display:flex;flex-direction:column;gap:14px"><div class="card empty"><b>Loading budget data…</b>Reading Sheet2.</div></div>
   </section>
 
@@ -451,8 +435,7 @@ const CONFIG = {
   // Budget section: reads the tab named "Sheet2" (columns Year, Month, Amount).
   // If you rename that tab, change sheet=Sheet2 below to the new tab name.
   BUDGET_CSV_URL: 'https://docs.google.com/spreadsheets/d/1atmIq7RGEySBZ1DhlbaYDksS3UQbxCp1DxWTHjjLIOU/gviz/tq?tqx=out:csv&headers=1&sheet=Sheet2',
-  BUDGET_CURRENCY: '₹',      // symbol shown before budget amounts; '' for none
-  BUDGET_JUMP_PCT: 15        // a month is flagged as a jump when it is at least this % above the previous month
+  BUDGET_CURRENCY: '₹'       // symbol shown before budget amounts; '' for none
 };
 
 /* Offline fallback: an exact, unmodified copy of the sheet's CSV export, taken at
@@ -1025,17 +1008,12 @@ function rebuildChartsForTheme(){ Object.values(S.charts).forEach(c => c && c.de
 
 
 /* =====================================================================
-   BUDGET (Sheet2): Year, Month, Amount — analysed by financial year Apr–Mar
+   BUDGET (Sheet2): Year, Month, Amount — month-on-month change
    ===================================================================== */
-const FY_MON = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
-const Bd = { records: null, byKey: new Map(), fys: [], fyMap: new Map(), issues: [], dupes: [], source: null, error: null, fyFilter: 'all' };
-const fyStartOf = (y, m) => m >= 3 ? y : y - 1;
-const fyLabel = s => `FY ${s}-${String((s + 1) % 100).padStart(2, '0')}`;
-const fyIdxOf = m => (m + 9) % 12; // Apr → 0 … Mar → 11
+const Bd = { records: null, byKey: new Map(), years: [], issues: [], dupes: [], source: null, error: null, fYear: 'all', fMonth: 'all', sort: 'key', dir: 1 };
 const fmtC = n => (n == null || !isFinite(n)) ? '—' : (n < 0 ? '−' : '') + CONFIG.BUDGET_CURRENCY + Math.abs(Math.round(n)).toLocaleString('en-US');
 const sgnC = n => (n == null || !isFinite(n)) ? '—' : (n > 0 ? '+' : n < 0 ? '−' : '') + CONFIG.BUDGET_CURRENCY + Math.abs(Math.round(n)).toLocaleString('en-US');
 const monLabel = r => `${MON[r.m]} ${r.y}`;
-const isDark = () => document.documentElement.matches('[data-theme="dark"]') || (matchMedia('(prefers-color-scheme: dark)').matches && !document.documentElement.matches('[data-theme="light"]'));
 
 function ingestBudget(input, source){
   const rows = (typeof input === 'string' ? parseCSV(input) : input).filter(r => r.some(c => String(c).trim() !== ''));
@@ -1048,7 +1026,7 @@ function ingestBudget(input, source){
   for (let r = start; r < rows.length; r++){
     const row = rows[r], sheetRow = r + 1;
     const yRaw = String(row[iY] || '').trim(), mRaw = String(row[iM] || '').trim();
-    const y = /^\d{4}$/.test(yRaw) ? +yRaw : NaN;
+    const y = /^\d{4}(\.0+)?$/.test(yRaw) ? Math.round(+yRaw) : NaN;
     let m = monthIdx(mRaw); if (m < 0 && /^\d{1,2}$/.test(mRaw) && +mRaw >= 1 && +mRaw <= 12) m = +mRaw - 1;
     if (!isFinite(y) || m < 0){ issues.push({ level: 'error', msg: `Sheet2 row ${sheetRow}: year "${yRaw || '(blank)'}" / month "${mRaw || '(blank)'}" not recognised — row not included.` }); continue; }
     const a = parseNumCell(row[iA]);
@@ -1062,38 +1040,20 @@ function ingestBudget(input, source){
   for (const [k, list] of groups){
     const f = list[0], amount = list.reduce((t, x) => t + x.amount, 0);
     if (list.length > 1) dupes.push({ label: MONTHS[f.m] + ' ' + f.y, rows: list.map(x => x.sheetRow), identical: list.every(x => x.amount === f.amount) });
-    records.push({ key: k, y: f.y, m: f.m, amount, fy: fyStartOf(f.y, f.m), fi: fyIdxOf(f.m), sheetRows: list.map(x => x.sheetRow), dup: list.length > 1 });
+    records.push({ key: k, y: f.y, m: f.m, amount, dup: list.length > 1 });
   }
   if (!records.length) throw new Error('No budget rows with a year, month and amount were found in Sheet2.');
   records.sort((a, b) => a.key < b.key ? -1 : 1);
   const byKey = new Map(records.map(r => [r.key, r]));
   for (const r of records){
     const pm = r.m === 0 ? byKey.get(keyOf(r.y - 1, 11)) : byKey.get(keyOf(r.y, r.m - 1));
-    r.prev = pm || null; r.mom = pm ? r.amount - pm.amount : null; r.momPct = pm && pm.amount ? r.mom / pm.amount * 100 : null;
-    const ly = byKey.get(keyOf(r.y - 1, r.m));
-    r.ly = ly || null; r.yoy = ly ? r.amount - ly.amount : null; r.yoyPct = ly && ly.amount ? r.yoy / ly.amount * 100 : null;
-    r.jump = r.momPct != null && r.momPct >= CONFIG.BUDGET_JUMP_PCT;
+    r.prev = pm || null;
+    r.chg = pm ? r.amount - pm.amount : null;
+    r.pct = pm && pm.amount ? r.chg / pm.amount * 100 : null;
   }
-  const fyMap = new Map();
-  for (const r of records){
-    if (!fyMap.has(r.fy)) fyMap.set(r.fy, { s: r.fy, recs: [] });
-    fyMap.get(r.fy).recs.push(r);
-  }
-  const fys = [...fyMap.keys()].sort((a, b) => a - b);
-  for (const s of fys){
-    const F = fyMap.get(s), recs = F.recs;
-    F.months = recs.length; F.total = recs.reduce((t, r) => t + r.amount, 0); F.avg = F.total / F.months;
-    F.max = recs.reduce((a, b) => b.amount > a.amount ? b : a); F.min = recs.reduce((a, b) => b.amount < a.amount ? b : a);
-    F.first = recs[0]; F.last = recs[recs.length - 1]; F.cmp = null;
-    if (fyMap.has(s - 1)){
-      // like-for-like: only months present in both financial years
-      const both = recs.filter(r => r.ly);
-      const cur = both.reduce((t, r) => t + r.amount, 0), prev = both.reduce((t, r) => t + r.ly.amount, 0);
-      if (both.length) F.cmp = { n: both.length, full: both.length === 12, cur, prev, chg: cur - prev, pct: prev ? (cur - prev) / prev * 100 : null, vs: fyLabel(s - 1) };
-    }
-  }
-  Object.assign(Bd, { records, byKey, fys, fyMap, issues, dupes, source, error: null });
-  if (Bd.fyFilter !== 'all' && !fyMap.has(+Bd.fyFilter)) Bd.fyFilter = 'all';
+  const years = [...new Set(records.map(r => r.y))].sort((a, b) => a - b);
+  Object.assign(Bd, { records, byKey, years, issues, dupes, source, error: null });
+  if (Bd.fYear !== 'all' && !years.includes(+Bd.fYear)) Bd.fYear = 'all';
 }
 
 async function loadBudget(){
@@ -1112,133 +1072,111 @@ async function loadBudget(){
   renderBudget();
 }
 
+function budgetFiltered(){
+  return Bd.records.filter(r => (Bd.fYear === 'all' || String(r.y) === Bd.fYear) && (Bd.fMonth === 'all' || String(r.m) === Bd.fMonth));
+}
+
 function renderBudget(){
   const box = $('budgetBody'); if (!box) return;
-  ['budLine', 'budFy'].forEach(k => { if (S.charts[k]){ S.charts[k].destroy(); delete S.charts[k]; } });
+  if (S.charts.budBar){ S.charts.budBar.destroy(); delete S.charts.budBar; }
   if (!Bd.records){
     box.innerHTML = `<div class="card empty"><b>${Bd.error ? 'Budget data could not be read.' : 'Loading budget data…'}</b>${Bd.error ? esc(Bd.error) + '<br>Check that Sheet2 exists with columns Year, Month, Amount and that the sheet is shared as “Anyone with the link can view”.' : 'Reading Sheet2.'}</div>`;
     return;
   }
-  const recs = Bd.records, fys = Bd.fys, F = s => Bd.fyMap.get(s), src = Bd.source;
+  const src = Bd.source;
   $('budNote').textContent = src.kind === 'live' ? `Sheet2 · live · updated ${fmtTime(src.at)}` : `Sheet2 · snapshot from ${fmtTime(src.at)}`;
   const out = [];
-
   if (Bd.dupes.length) out.push(`<div class="banner" role="alert"><span>⚠</span><div><b>Duplicate budget months in Sheet2.</b> ${Bd.dupes.map(d => `${esc(d.label)} (rows ${d.rows.join(', ')}${d.identical ? ', identical values' : ''})`).join('; ')}. Their amounts are summed below. If they are repeated entries, correct Sheet2 and refresh.</div></div>`);
   const bErr = Bd.issues.filter(i => i.level === 'error');
   if (bErr.length) out.push(`<div class="banner" role="alert"><span>⚠</span><div><b>${bErr.length} Sheet2 row${bErr.length > 1 ? 's' : ''} could not be read:</b> ${bErr.map(i => esc(i.msg)).join(' ')}</div></div>`);
   if (src.kind === 'snapshot') out.push(`<div class="banner"><span>ℹ</span><div><b>Showing a snapshot of Sheet2</b> taken ${fmtTime(src.at)}. The live request did not succeed here (${esc(src.error || 'blocked')}).</div></div>`);
 
-  const full = fys.filter(s => F(s).months === 12);
-  let headline;
-  if (full.length >= 2){
-    const a = F(full[0]), b = F(full[full.length - 1]), pc = (b.total - a.total) / a.total * 100;
-    headline = `Total budget went from <b>${fmtC(a.total)}</b> in ${fyLabel(a.s)} to <b>${fmtC(b.total)}</b> in ${fyLabel(b.s)}, a change of <b>${sgnP(pc)}</b> (${sgnC(b.total - a.total)}).`;
-  } else headline = `${recs.length} months of budget data.`;
-  out.push(`<div class="card bud-head"><p>${headline}</p><span class="chip num">${recs.length} months · ${monLabel(recs[0])} – ${monLabel(recs[recs.length - 1])}</span></div>`);
+  const rows = budgetFiltered();
+  const monthsInYear = Bd.fYear === 'all' ? null : new Set(Bd.records.filter(r => String(r.y) === Bd.fYear).map(r => r.m));
+  const filterBar = `<div class="tbl-tools">
+      <div class="field"><label for="budYear">Year</label><select id="budYear" class="ctl" style="width:auto"><option value="all">All years</option>${Bd.years.slice().reverse().map(y => `<option value="${y}"${String(y) === Bd.fYear ? ' selected' : ''}>${y}</option>`).join('')}</select></div>
+      <div class="field"><label for="budMonth">Month</label><select id="budMonth" class="ctl" style="width:auto"><option value="all">All months</option>${MONTHS.map((n, i) => `<option value="${i}"${String(i) === Bd.fMonth ? ' selected' : ''}${monthsInYear && !monthsInYear.has(i) ? ' disabled' : ''}>${n}</option>`).join('')}</select></div>
+      <button class="btn reset" id="budReset" type="button" style="height:44px;align-self:flex-end">Reset</button>
+      <span class="count num" style="align-self:flex-end">${rows.length} of ${Bd.records.length} months</span>
+    </div>`;
 
-  out.push(`<div class="fy-grid">${fys.map((s, i) => {
-    const X = F(s), latest = i === fys.length - 1;
-    const chg = X.cmp
-      ? `<div class="chg"><b class="num">${sgnP(X.cmp.pct)}</b> <span class="num">${sgnC(X.cmp.chg)}</span><small>${X.cmp.full ? `vs ${X.cmp.vs} total (${fmtC(X.cmp.prev)})` : `vs same ${X.cmp.n} month${X.cmp.n > 1 ? 's' : ''} of ${X.cmp.vs} (${fmtC(X.cmp.prev)})`}</small></div>`
-      : `<div class="chg"><small>First financial year in Sheet2, so there is no earlier year to compare</small></div>`;
-    return `<article class="card fy-card${latest ? ' latest' : ''}">
-      <div class="top-row"><span class="fy">${fyLabel(s)}</span>${X.months < 12 ? `<span class="chip warn">${X.months} of 12 months</span>` : `<span class="chip">12 months</span>`}</div>
-      <div class="per">Apr ${s} – Mar ${s + 1}${X.months < 12 ? ` · data ${MON[X.first.m]}–${MON[X.last.m]}` : ''}</div>
-      <div class="val num">${fmtC(X.total)}</div>${chg}
-      <div class="per num">Avg ${fmtC(X.avg)} / month · Highest ${MON[X.max.m]} ${fmtC(X.max.amount)}</div>
-    </article>`; }).join('')}</div>`);
+  // Summary for the current filter
+  let summary;
+  if (!rows.length){
+    summary = `<div class="bud-sum"><p>No budget data for this selection.</p></div>`;
+  } else if (rows.length === 1){
+    const r = rows[0];
+    summary = `<div class="bud-sum one">
+      <div><div class="lbl">${MONTHS[r.m]} ${r.y} budget</div><div class="big num">${fmtC(r.amount)}</div></div>
+      <div><div class="lbl">${r.prev ? `Change vs ${MONTHS[r.prev.m]} ${r.prev.y}` : 'Change vs previous month'}</div><div class="big num">${r.prev ? sgnP(r.pct) : '—'}</div><div class="sub num">${r.prev ? `${sgnC(r.chg)} · ${fmtC(r.prev.amount)} → ${fmtC(r.amount)}` : 'Previous month is not in Sheet2'}</div></div>
+    </div>`;
+  } else {
+    const withChg = rows.filter(r => r.pct != null);
+    const up = withChg.filter(r => r.chg > 0).length, down = withChg.filter(r => r.chg < 0).length;
+    const maxUp = withChg.filter(r => r.chg > 0).sort((a, b) => b.pct - a.pct)[0];
+    const maxDown = withChg.filter(r => r.chg < 0).sort((a, b) => a.pct - b.pct)[0];
+    summary = `<div class="bud-sum">
+      <div><div class="lbl">Months increased</div><div class="big num">${up}</div><div class="sub num">${down} decreased</div></div>
+      <div><div class="lbl">Biggest increase</div><div class="big num">${maxUp ? sgnP(maxUp.pct) : '—'}</div><div class="sub num">${maxUp ? `${MONTHS[maxUp.m]} ${maxUp.y} · ${sgnC(maxUp.chg)}` : 'No increases in this selection'}</div></div>
+      <div><div class="lbl">Biggest decrease</div><div class="big num">${maxDown ? sgnP(maxDown.pct) : '—'}</div><div class="sub num">${maxDown ? `${MONTHS[maxDown.m]} ${maxDown.y} · ${sgnC(maxDown.chg)}` : 'No decreases in this selection'}</div></div>
+    </div>`;
+  }
 
-  const top = recs.filter(r => r.momPct != null && r.mom > 0).sort((a, b) => b.momPct - a.momPct).slice(0, 6);
-  out.push(`<div class="bud-2col">
-    <article class="card chart-card">
-      <div class="chart-head"><div><h3>Monthly budget</h3><p class="cap">Dashed lines mark the start of each financial year · hover for month-on-month and year-on-year change</p></div>
-        <div class="legend"><span><i class="line" style="background:var(--brand)"></i>Budget</span><span><i style="background:var(--warn);border-radius:50%"></i>≥${CONFIG.BUDGET_JUMP_PCT}% above previous month</span></div></div>
-      <div class="chart-box"><canvas id="budLine" aria-label="Monthly budget line chart"></canvas></div>
-    </article>
-    <article class="card">
-      <div style="padding:18px 20px 10px"><h3 style="margin:0;font-size:15px;font-weight:700">Biggest month-on-month increases</h3><p class="cap" style="margin:2px 0 0;font-size:12px;color:var(--muted)">Where the budget rose most sharply vs the previous month</p></div>
-      <ul class="jump-list">${top.length ? top.map((r, i) => `<li><span class="rk">${i + 1}</span><span class="what"><b>${MONTHS[r.m]} ${r.y}</b><span class="num">${fmtC(r.prev.amount)} → ${fmtC(r.amount)} (${sgnC(r.mom)}) · ${fyLabel(r.fy)}</span></span><span class="pc num">${sgnP(r.momPct)}</span></li>`).join('') : '<li><span></span><span class="what">No month-on-month increases in the data.</span><span></span></li>'}</ul>
-    </article>
-  </div>`);
+  const chart = rows.length > 1 ? `<div class="chart-card" style="border-top:1px solid var(--border)">
+      <div class="chart-head"><div><h3>Monthly budget</h3><p class="cap">Budget per month · hover a point to see the change vs the previous month</p></div>
+        <div class="legend"><span><i class="line" style="background:var(--brand)"></i>Budget</span></div></div>
+      <div class="chart-box"><canvas id="budBar" aria-label="Monthly budget line chart"></canvas></div>
+    </div>` : '';
 
-  const shownFys = fys.slice(-3);
-  out.push(`<article class="card chart-card">
-    <div class="chart-head"><div><h3>Financial years side by side</h3><p class="cap">Monthly budget, April to March${fys.length > 3 ? ' · latest 3 financial years' : ''}</p></div>
-      <div class="legend" id="budFyLegend"></div></div>
-    <div class="chart-box"><canvas id="budFy" aria-label="Budget by financial year chart"></canvas></div>
-  </article>`);
+  const sorted = rows.slice().sort((a, b) => {
+    const x = a[Bd.sort], y = b[Bd.sort];
+    if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+    return (x < y ? -1 : x > y ? 1 : 0) * Bd.dir;
+  });
+  const th = (k, t) => `<th><button class="th-btn" data-bsort="${k}" type="button"${Bd.sort === k ? ` aria-sort="${Bd.dir > 0 ? 'ascending' : 'descending'}"` : ''}>${t}<span class="arr">${Bd.sort === k ? (Bd.dir > 0 ? '▲' : '▼') : '↕'}</span></button></th>`;
+  const table = `<div class="tbl-scroll" style="border-top:1px solid var(--border)"><table>
+      <thead><tr>${th('key', 'Month')}${th('amount', 'Budget')}<th>Previous month</th>${th('chg', 'Change (₹)')}${th('pct', 'Change (%)')}</tr></thead>
+      <tbody>${sorted.length ? sorted.map(r => `<tr><td>${MONTHS[r.m]} ${r.y}${r.dup ? ' <span class="chip warn">dup</span>' : ''}</td><td>${fmtC(r.amount)}</td><td>${r.prev ? `${fmtC(r.prev.amount)} <span style="color:var(--muted)">(${MON[r.prev.m]} ${r.prev.y})</span>` : '—'}</td><td>${sgnC(r.chg)}</td><td class="${r.chg > 0 ? 'pos' : r.chg < 0 ? 'neg' : ''}">${sgnP(r.pct)}</td></tr>`).join('')
+        : `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">No budget data for this selection.</td></tr>`}</tbody>
+    </table></div>`;
 
-  out.push(`<div class="card"><div class="sec-h" style="padding:16px 20px 0;margin:0"><h2 style="font-size:12px">Financial year summary</h2><span class="note">% change compares only months present in both years</span></div>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>Financial year</th><th>Months</th><th>Total budget</th><th>Change vs previous FY</th><th>% change</th><th>Avg / month</th><th>Highest month</th><th>Lowest month</th></tr></thead>
-      <tbody>${fys.map(s => { const X = F(s); return `<tr class="fy-row"><td>${fyLabel(s)}</td><td>${X.months}/12</td><td>${fmtC(X.total)}</td><td>${X.cmp ? sgnC(X.cmp.chg) + (X.cmp.full ? '' : ` <span class="chip">${X.cmp.n} mo</span>`) : '—'}</td><td>${X.cmp ? sgnP(X.cmp.pct) : '—'}</td><td>${fmtC(X.avg)}</td><td>${MON[X.max.m]} ${X.max.y} · ${fmtC(X.max.amount)}</td><td>${MON[X.min.m]} ${X.min.y} · ${fmtC(X.min.amount)}</td></tr>`; }).join('')}</tbody>
-    </table></div></div>`);
-
-  const filt = Bd.fyFilter === 'all' ? recs : recs.filter(r => String(r.fy) === Bd.fyFilter);
-  out.push(`<div class="card">
-    <div class="tbl-tools"><strong style="font-size:14px">Month-wise budget change</strong>
-      <label for="budFyFilter" class="sr">Financial year</label>
-      <select id="budFyFilter" class="ctl" style="width:auto;margin-left:auto"><option value="all">All financial years</option>${fys.slice().reverse().map(s => `<option value="${s}"${String(s) === Bd.fyFilter ? ' selected' : ''}>${fyLabel(s)}</option>`).join('')}</select></div>
-    <div class="tbl-scroll"><table>
-      <thead><tr><th>Month</th><th>Financial year</th><th>Budget</th><th>vs previous month</th><th>MoM %</th><th>Same month last year</th><th>vs last year</th><th>YoY %</th></tr></thead>
-      <tbody>${filt.map((r, i) => `<tr class="${i && r.fi === 0 ? 'fy-start' : ''}"><td>${MONTHS[r.m]} ${r.y}${r.jump ? ' <span class="chip jump">jump</span>' : ''}${r.dup ? ' <span class="chip warn">dup</span>' : ''}</td><td>${fyLabel(r.fy)}</td><td>${fmtC(r.amount)}</td><td>${sgnC(r.mom)}</td><td>${sgnP(r.momPct)}</td><td>${r.ly ? fmtC(r.ly.amount) : '—'}</td><td>${sgnC(r.yoy)}</td><td>${sgnP(r.yoyPct)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td>${Bd.fyFilter === 'all' ? 'All months' : fyLabel(+Bd.fyFilter)}</td><td></td><td>${fmtC(filt.reduce((t, r) => t + r.amount, 0))}</td><td colspan="5" style="text-align:left;font-weight:500;color:var(--muted)">“jump” = at least ${CONFIG.BUDGET_JUMP_PCT}% above the previous month</td></tr></tfoot>
-    </table></div></div>`);
-
+  out.push(`<div class="card">${filterBar}${summary}${chart}${table}</div>`);
   box.innerHTML = out.join('');
-  $('budFyFilter').addEventListener('change', e => { Bd.fyFilter = e.target.value; renderBudget(); });
-  drawBudgetCharts(shownFys);
+
+  $('budYear').addEventListener('change', e => {
+    Bd.fYear = e.target.value;
+    if (Bd.fYear !== 'all' && Bd.fMonth !== 'all' && !Bd.byKey.has(keyOf(+Bd.fYear, +Bd.fMonth))) Bd.fMonth = 'all';
+    renderBudget();
+  });
+  $('budMonth').addEventListener('change', e => { Bd.fMonth = e.target.value; renderBudget(); });
+  $('budReset').addEventListener('click', () => { Bd.fYear = 'all'; Bd.fMonth = 'all'; Bd.sort = 'key'; Bd.dir = 1; renderBudget(); });
+  box.querySelectorAll('[data-bsort]').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.bsort; if (Bd.sort === k) Bd.dir *= -1; else { Bd.sort = k; Bd.dir = k === 'key' ? 1 : -1; }
+    renderBudget(); const nb = document.querySelector(`[data-bsort="${k}"]`); if (nb) nb.focus();
+  }));
+  if (rows.length > 1) drawBudgetChart(rows);
 }
 
-function drawBudgetCharts(shownFys){
-  if (!window.Chart){ document.querySelectorAll('#budgetBody .chart-box').forEach(b => b.innerHTML = '<div class="empty">Charts could not load. All figures remain in the tables.</div>'); return; }
+function drawBudgetChart(rows){
+  if (!window.Chart){ const b = document.querySelector('#budgetBody .chart-box'); if (b) b.innerHTML = '<div class="empty">Chart could not load. All figures remain in the table.</div>'; return; }
   applyChartDefaults();
-  const recs = Bd.records, tt = tooltipStyle();
-  const brand = tok('--brand'), warn = tok('--warn'), surf = tok('--surface'), grid = tok('--grid'), ink2 = tok('--ink-2'), muted = tok('--muted'), strong = tok('--border-strong');
-  const yScale = { beginAtZero: false, grid: { color: grid, drawTicks: false }, border: { display: false }, ticks: { padding: 8, callback: v => CONFIG.BUDGET_CURRENCY + Number(v).toLocaleString('en-US') } };
-  const fyLines = {
-    id: 'fyLines',
-    afterDatasetsDraw(c){
-      const { ctx, chartArea: a, scales: { x } } = c;
-      ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = strong; ctx.lineWidth = 1; ctx.fillStyle = muted; ctx.font = '600 11px ' + (tok('--font') || 'sans-serif');
-      recs.forEach((r, i) => { if (r.fi !== 0) return; const px = x.getPixelForValue(i); ctx.beginPath(); ctx.moveTo(px, a.top); ctx.lineTo(px, a.bottom); ctx.stroke(); ctx.fillText(fyLabel(r.fy), px + 4, a.top + 10); });
-      ctx.restore();
-    }
-  };
-  S.charts.budLine = new Chart($('budLine'), {
+  const tt = tooltipStyle(), brand = tok('--brand'), surf = tok('--surface'), grid = tok('--grid'), ink2 = tok('--ink-2'), strong = tok('--border-strong');
+  const sameYear = Bd.fYear !== 'all';
+  S.charts.budBar = new Chart($('budBar'), {
     type: 'line',
-    data: { labels: recs.map(r => `${MON[r.m]} '${String(r.y).slice(2)}`), datasets: [{ label: 'Budget', data: recs.map(r => r.amount), borderColor: brand, borderWidth: 2, tension: .2, fill: true, backgroundColor: tok('--brand-soft'),
-      pointRadius: recs.map(r => r.jump ? 5 : 2), pointBackgroundColor: recs.map(r => r.jump ? warn : brand), pointBorderColor: surf, pointBorderWidth: recs.map(r => r.jump ? 2 : 0), pointHoverRadius: 6 }] },
+    data: { labels: rows.map(r => sameYear ? MON[r.m] : `${MON[r.m]} '${String(r.y).slice(2)}`),
+      datasets: [{ label: 'Budget', data: rows.map(r => r.amount), borderColor: brand, borderWidth: 2, tension: .2, fill: true, backgroundColor: tok('--brand-soft'),
+        pointRadius: rows.length > 24 ? 2 : 4, pointBackgroundColor: brand, pointBorderColor: surf, pointBorderWidth: 2, pointHoverRadius: 6 }] },
     options: { maintainAspectRatio: false, animation: { duration: 250 }, interaction: { mode: 'index', intersect: false },
-      layout: { padding: { top: 14 } },
-      scales: { y: yScale, x: { grid: { display: false }, border: { color: strong }, ticks: { color: ink2, maxRotation: 0, autoSkip: true, autoSkipPadding: 10 } } },
+      layout: { padding: { top: 8 } },
+      scales: {
+        y: { grid: { color: grid, drawTicks: false }, border: { display: false }, ticks: { padding: 8, callback: v => CONFIG.BUDGET_CURRENCY + Number(v).toLocaleString('en-US') } },
+        x: { grid: { display: false }, border: { color: strong }, ticks: { color: ink2, maxRotation: 0, autoSkip: true, autoSkipPadding: 10 } }
+      },
       plugins: { legend: { display: false }, tooltip: { ...tt, displayColors: false, callbacks: {
-        title: it => { const r = recs[it[0].dataIndex]; return `${MONTHS[r.m]} ${r.y} · ${fyLabel(r.fy)}`; },
+        title: it => { const r = rows[it[0].dataIndex]; return `${MONTHS[r.m]} ${r.y}`; },
         label: c => `Budget: ${fmtC(c.raw)}`,
-        afterLabel: c => { const r = recs[c.dataIndex];
-          return [r.prev ? `vs ${monLabel(r.prev)}: ${sgnC(r.mom)} (${sgnP(r.momPct)})` : 'No previous month in data',
-                  r.ly ? `vs ${monLabel(r.ly)}: ${sgnC(r.yoy)} (${sgnP(r.yoyPct)})` : 'No same month last year']; }
-      } } } },
-    plugins: [fyLines]
-  });
-
-  // FY overlay: newest FY = green (thick solid), previous = amber (solid), older = blue (dashed)
-  const amber = isDark() ? '#D99A45' : '#C9822B';
-  const styles = [{ c: tok('--c-invalid'), dash: [6, 4], w: 2 }, { c: amber, dash: [], w: 2 }, { c: tok('--c-valid'), dash: [], w: 3 }].slice(3 - shownFys.length);
-  const ds = shownFys.map((s, i) => {
-    const X = Bd.fyMap.get(s), arr = Array(12).fill(null); X.recs.forEach(r => { arr[r.fi] = r.amount; });
-    const st = styles[i];
-    return { label: fyLabel(s), fy: s, data: arr, borderColor: st.c, backgroundColor: st.c, pointBackgroundColor: st.c, pointBorderColor: surf, pointBorderWidth: 2, borderDash: st.dash, borderWidth: st.w, pointRadius: 3, pointHoverRadius: 6, tension: .2, spanGaps: false };
-  });
-  $('budFyLegend').innerHTML = ds.map(d => `<span><i class="line" style="background:${d.borderDash.length ? `repeating-linear-gradient(90deg,${d.borderColor} 0 5px,transparent 5px 8px)` : d.borderColor}"></i>${d.label} · ${fmtC(Bd.fyMap.get(d.fy).total)}</span>`).join('');
-  S.charts.budFy = new Chart($('budFy'), {
-    type: 'line', data: { labels: FY_MON, datasets: ds },
-    options: { maintainAspectRatio: false, animation: { duration: 250 }, interaction: { mode: 'index', intersect: false },
-      scales: { y: yScale, x: { grid: { display: false }, border: { color: strong }, ticks: { color: ink2 } } },
-      plugins: { legend: { display: false }, tooltip: { ...tt, callbacks: {
-        title: it => FY_MON[it[0].dataIndex],
-        label: c => { if (c.raw == null) return ` ${c.dataset.label}: no data`; const s = c.dataset.fy, r = Bd.byKey.get(keyOf(c.dataIndex < 9 ? s : s + 1, (c.dataIndex + 3) % 12));
-          return ` ${c.dataset.label}: ${fmtC(c.raw)}${r && r.ly ? `  (${sgnP(r.yoyPct)} vs previous FY)` : ''}`; }
+        afterLabel: c => { const r = rows[c.dataIndex]; return r.prev ? `vs ${monLabel(r.prev)} (${fmtC(r.prev.amount)}): ${sgnC(r.chg)} (${sgnP(r.pct)})` : 'No previous month in Sheet2'; }
       } } } }
   });
 }
